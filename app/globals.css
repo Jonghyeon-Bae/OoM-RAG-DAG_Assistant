@@ -1,26 +1,29 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-primary-50: #f2f7fc;
+  --color-primary-100: #e1eef9;
+  --color-primary-200: #c5ddf2;
+  --color-primary-400: #8fbbe4;
+  --color-primary-700: #2f5f8a;
+  --color-ink: #2b313a;
+  --color-ink-muted: #6b7480;
+  --color-surface: #ffffff;
+  --color-border: #e3e9f0;
+  --color-fail-bg: #f8dada;
+  --color-fail: #b23b3b;
+  --color-success-bg: #d9efe3;
+  --color-success: #2e7a55;
+  --color-ref-bg: #e6e8ee;
+  --color-ref: #5c6475;
+  --color-warn-bg: #fbebd2;
+  --color-warn: #9a6418;
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  --radius-card: 12px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-primary-50);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }
