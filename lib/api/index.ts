@@ -3,7 +3,7 @@
 import type { Workspace, User, LogNode, LogCounts, Chain, ChainNode, LogType } from "@/lib/types/domain";
 import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
-import { store } from "@/lib/api/store";
+import { store, type StoreNode } from "@/lib/api/store";
 
 export async function getWorkspaces(): Promise<Workspace[]> {
   return workspaces as Workspace[];
@@ -16,7 +16,7 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function getLogs(wsId: number, opts: { type?: LogType | "all"; q?: string } = {}): Promise<{ items: LogNode[]; counts: LogCounts }> {
-  const all = store.nodes.filter((l) => l.workspace_id === wsId);
+  const all = store.nodes.filter((l) => l.workspace_id === wsId).map(settle);
   const counts: LogCounts = {
     all: all.length,
     fail: all.filter((l) => l.type === "fail").length,
@@ -72,14 +72,53 @@ export async function getChain(wsId: number, entryId: number, maxDepth = 3): Pro
   return { entry_id: entryId, nodes, edges, summary: root ? `${root.title} 체인: 노드 ${nodes.length}개, 해결 ${nodes.filter((n) => n.type === "success" && n.status === "active").length}건. (AI 요약은 3단계에서 LLM 호출로 대체)` : null };
 }
 
+// 목업 정제 워커: 읽는 시점에 경과 시간으로 상태 전이 (pending 1.5s → processing 3.5s → done)
+function settle(n: StoreNode): LogNode {
+  if (n.refine_status === "done" || n.refine_status === "failed" || !n.refine_started_at) return n;
+  const t = Date.now() - n.refine_started_at;
+  if (t < 1500) n.refine_status = "pending";
+  else if (t < 3500) n.refine_status = "processing";
+  else {
+    n.refine_status = "done";
+    const words = `${n.title} ${n.body}`.replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((w) => w.length >= 2);
+    n.keywords = [...new Set(words)].slice(0, 5);
+    n.resolution_summary = n.type === "success" ? `${n.title} — 조치 적용, 결과 확인됨` : n.type === "ref" ? `참고 자료: ${n.title}` : `증상: ${n.title}`;
+    n.last_confirmed_at = n.type === "success" ? new Date().toISOString() : null;
+  }
+  return n;
+}
+
+export async function getLog(wsId: number, id: number): Promise<LogNode | null> {
+  const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
+  return n ? settle(n) : null;
+}
+
+export async function refineLog(wsId: number, id: number): Promise<LogNode | null> {
+  const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
+  if (!n) return null;
+  n.refine_status = "pending";
+  n.refine_started_at = Date.now();
+  n.keywords = [];
+  n.resolution_summary = null;
+  return n;
+}
+
+export async function setLogStatus(wsId: number, id: number, status: "active" | "deprecated"): Promise<LogNode | null> {
+  const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
+  if (!n) return null;
+  n.status = status;
+  return n;
+}
+
 export async function createLog(
   wsId: number,
   input: { type: LogType; title: string; body: string; parent_id: number | null; author_name?: string },
 ): Promise<LogNode> {
   const id = store.nextId++;
   const parent = input.parent_id ? store.nodes.find((n) => n.id === input.parent_id) : undefined;
-  const node: LogNode = {
+  const node: StoreNode = {
     id,
+    refine_started_at: Date.now(),
     workspace_id: wsId,
     type: input.type,
     status: "active",

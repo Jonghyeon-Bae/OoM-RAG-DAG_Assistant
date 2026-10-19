@@ -16,3 +16,23 @@ export async function postLog(wsId: number, input: { type: LogType; title: strin
   if (!r.ok) throw new Error(`createLog ${r.status}`);
   return r.json();
 }
+
+export async function fetchLog(wsId: number, id: number): Promise<LogNode | null> {
+  const r = await fetch(`${base}/logs/${id}`, { headers: headers(wsId), cache: "no-store" });
+  return r.ok ? r.json() : null;
+}
+
+export async function fetchRecentLogs(wsId: number, limit = 8): Promise<LogNode[]> {
+  const r = await fetch(`${base}/logs?limit=${limit}`, { headers: headers(wsId), cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+
+export async function postRefine(wsId: number, id: number): Promise<LogNode | null> {
+  const r = await fetch(`${base}/logs/${id}/refine`, { method: "POST", headers: headers(wsId) });
+  return r.ok ? r.json() : null;
+}
+
+export async function patchStatus(wsId: number, id: number, status: "active" | "deprecated", reason?: string): Promise<LogNode | null> {
+  const r = await fetch(`${base}/logs/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ status, reason }) });
+  return r.ok ? r.json() : null;
+}

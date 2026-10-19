@@ -120,6 +120,18 @@ export function TimelineView({
                       <span className="text-xs text-ink-muted">{fmt(l.created_at)}</span>
                     </div>
                     <div className={cn("font-semibold text-ink", l.status === "deprecated" && "line-through opacity-60")}>{l.title}</div>
+                    {/* 본문: 평소 2줄 미리보기, 선택 시 전문 + 정제 결과 */}
+                    <p className={cn("text-sm leading-relaxed text-ink-muted", !selected && "line-clamp-2")}>{l.body}</p>
+                    {selected && (
+                      <div className="mt-1 flex flex-col gap-2 border-t border-border pt-3">
+                        {l.resolution_summary && <p className="text-sm font-medium text-ink">{l.resolution_summary}</p>}
+                        <div className="flex flex-wrap gap-1.5">
+                          {l.error_code && <Chip tone="fail">{l.error_code}</Chip>}
+                          {l.keywords.map((k) => <Chip key={k}>#{k}</Chip>)}
+                          {l.refine_status !== "done" && <Chip tone="warn">{l.refine_status === "failed" ? "정제 실패" : "정제 전"}</Chip>}
+                        </div>
+                      </div>
+                    )}
                     <div className="text-xs text-ink-muted">
                       {l.author_name} · {l.path_label}
                       {l.status === "deprecated" && <span className="ml-2 rounded-full bg-warn-bg px-2 py-0.5 text-warn">폐기</span>}

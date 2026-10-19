@@ -4,9 +4,10 @@ import logsSeed from "@/mocks/logs.json";
 import edgesSeed from "@/mocks/edges.json";
 
 type Edge = { parent_id: number; child_id: number };
+export type StoreNode = LogNode & { refine_started_at?: number };
 
-const g = globalThis as unknown as { __oomStore?: { nodes: LogNode[]; edges: Edge[]; nextId: number } };
+const g = globalThis as unknown as { __oomStore?: { nodes: StoreNode[]; edges: Edge[]; nextId: number } };
 if (!g.__oomStore) {
-  g.__oomStore = { nodes: [...(logsSeed as LogNode[])], edges: [...(edgesSeed as Edge[])], nextId: 200 };
+  g.__oomStore = { nodes: [...(logsSeed as StoreNode[])], edges: [...(edgesSeed as Edge[])], nextId: 200 };
 }
 export const store = g.__oomStore;

@@ -15,8 +15,8 @@
   --color-surface: #ffffff;
   --color-fail-bg: #f8dada;
   --color-fail: #b23b3b;
-  --color-success-bg: #d9efe3;
-  --color-success: #2e7a55;
+  --color-success-bg: #dcebfa;
+  --color-success: #2563a8;
   --color-ref-bg: #e6e8ee;
   --color-ref: #5c6475;
   --color-warn-bg: #fbebd2;
@@ -90,7 +90,7 @@
   --chart-1: #8fbbe4;
   --chart-2: #c5ddf2;
   --chart-3: #2f5f8a;
-  --chart-4: #a8d5ba;
+  --chart-4: #9cc2ea;
   --chart-5: #f0c7c7;
   --radius: 0.75rem;
   --sidebar: #ffffff;

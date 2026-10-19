@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLog } from "@/lib/api";
+import { createLog, getLogs } from "@/lib/api";
+
+export async function GET(req: NextRequest) {
+  const ws = Number(req.headers.get("x-workspace-id") ?? 1);
+  const limit = Number(req.nextUrl.searchParams.get("limit") ?? 8);
+  const { items } = await getLogs(ws);
+  return NextResponse.json(items.slice(0, limit));
+}
 
 export async function POST(req: NextRequest) {
   const ws = Number(req.headers.get("x-workspace-id") ?? 1);

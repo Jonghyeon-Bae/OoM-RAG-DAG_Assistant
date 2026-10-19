@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,24 +19,24 @@ const ROOT = "root";
 
 // 유형별 버튼 색: 성공 파랑 / 실패 빨강 / 참고 회색. 선택 시 채움, 미선택 시 옅은 바탕.
 const toneBtn: Record<LogType, { on: string; off: string }> = {
-  success: { on: "border-primary-700 bg-primary-700 text-white", off: "border-primary-200 bg-primary-100 text-primary-700 hover:bg-primary-200" },
+  success: { on: "border-success bg-success text-white", off: "border-success-bg bg-success-bg text-success hover:bg-[#c9def5]" },
   fail: { on: "border-fail bg-fail text-white", off: "border-fail-bg bg-fail-bg text-fail hover:bg-[#f2c9c9]" },
   ref: { on: "border-ref bg-ref text-white", off: "border-ref-bg bg-ref-bg text-ref hover:bg-[#d9dce5]" },
 };
 
-export function LogForm({ wsId, candidates }: { wsId: number; candidates: LogNode[] }) {
+export function LogForm({ wsId, candidates, onCreated }: { wsId: number; candidates: LogNode[]; onCreated?: (n: LogNode) => void }) {
   const [type, setType] = useState<LogType>("fail");
   const [parent, setParent] = useState<string>(ROOT);
   const [resolveRoot, setResolveRoot] = useState(false);
   const [preview, setPreview] = useState<Chain | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
-  // 등록 → 타임라인으로 이동하며 방금 등록한 노드를 선택 상태로 연다 (URL ?entry= 가 선택 상태의 단일 출처)
+  // 등록 → 화면에 머물고 우측 정제 패널이 진행 상황을 보여준다. 폼은 초기화.
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget; // await 이후 currentTarget은 null이 되므로 먼저 보관
+    const fd = new FormData(form);
     setBusy(true);
     setError(null);
     try {
@@ -48,7 +47,13 @@ export function LogForm({ wsId, candidates }: { wsId: number; candidates: LogNod
         parent_id: parent === ROOT ? null : Number(parent),
         resolve_root: resolveRoot,
       });
-      router.push(`/w/${wsId}/timeline?entry=${node.id}`);
+      onCreated?.(node);
+      form.reset();
+      setType("fail");
+      setParent(ROOT);
+      setPreview(null);
+      setResolveRoot(false);
+      setBusy(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "등록 실패");
       setBusy(false);
