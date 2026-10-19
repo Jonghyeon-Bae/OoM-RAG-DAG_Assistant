@@ -51,15 +51,25 @@ export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; sele
     return () => ro.disconnect();
   }, []);
 
-  // 선택 노드 기준 관련 집합: 자신 + 직접 부모·자식
+  // 선택 노드 기준 관련 집합: 조상 전체 + 자신 + 자손 전체 (선택 노드를 지나는 모든 경로)
   const related = useMemo(() => {
     const s = new Set<number>();
     if (!selectedId) return s;
-    s.add(selectedId);
-    chain.edges.forEach((e) => {
-      if (e.parent_id === selectedId) s.add(e.child_id);
-      if (e.child_id === selectedId) s.add(e.parent_id);
-    });
+    const up = (id: number) => {
+      if (s.has(id)) return;
+      s.add(id);
+      chain.edges.filter((e) => e.child_id === id).forEach((e) => up(e.parent_id));
+    };
+    const down = (id: number) => {
+      chain.edges.filter((e) => e.parent_id === id).forEach((e) => {
+        if (!s.has(e.child_id)) {
+          s.add(e.child_id);
+          down(e.child_id);
+        }
+      });
+    };
+    up(selectedId);
+    down(selectedId);
     return s;
   }, [chain, selectedId]);
 
@@ -101,7 +111,7 @@ export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; sele
           const x2 = b.x - GAP, y2 = b.y + b.h / 2;
           const xEnd = x2 - HEAD; // 선은 화살촉 앞에서 끝남
           const mx = (x1 + xEnd) / 2;
-          const hot = selectedId ? related.has(e.parent_id) && related.has(e.child_id) && (e.parent_id === selectedId || e.child_id === selectedId) : false;
+          const hot = selectedId ? related.has(e.parent_id) && related.has(e.child_id) : false;
           const dim = selectedId ? !hot : false;
           const color = hot ? "var(--color-primary-700)" : "var(--color-primary-400)";
           // 끝점 접선: 제어점(mx, y2) → (xEnd, y2) 이므로 각도는 항상 수평(0°)이지만, 일반화를 위해 계산한다.
