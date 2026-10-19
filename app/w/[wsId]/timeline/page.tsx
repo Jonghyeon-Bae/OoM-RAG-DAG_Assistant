@@ -19,7 +19,7 @@ async function TimelineContent({
   return (
     <>
       <Header title="트러블슈팅 타임라인" subtitle="실패·성공·참고 로그를 부모-자식 트리(DAG)로 연결해 보여줍니다" ws={ws} />
-      <TimelineView wsId={ws.id} logs={items} initialEntry={initialEntry} initialChain={initialChain} />
+      <TimelineView key={`${ws.id}-${initialEntry}`} wsId={ws.id} logs={items} initialEntry={initialEntry} initialChain={initialChain} />
     </>
   );
 }

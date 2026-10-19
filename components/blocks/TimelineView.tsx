@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Chip, TypeBadge, cn } from "@/components/ui";
 import { ChainGraph } from "@/components/blocks/ChainGraph";
-import { getChain } from "@/lib/api";
+import { fetchChain } from "@/lib/api/client";
 import type { Chain, LogNode, LogType } from "@/lib/types/domain";
 
 const filters: { key: LogType | "all"; label: string; cls: string }[] = [
@@ -74,7 +74,7 @@ export function TimelineView({
   // 선택 변경 → 체인만 교체. 이전 체인을 유지한 채 바꿔 끼워 깜빡임 없음. URL은 replaceState로만 동기화.
   useEffect(() => {
     let alive = true;
-    getChain(wsId, entryId).then((c) => {
+    fetchChain(wsId, entryId).then((c) => {
       if (alive) startTransition(() => setChain(c));
     });
     const url = new URL(window.location.href);

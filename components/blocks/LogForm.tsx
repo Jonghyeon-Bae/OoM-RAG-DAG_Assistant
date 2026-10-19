@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, TypeBadge, typeLabel, cn } from "@/components/ui";
 import { ChainBlock } from "@/components/blocks/ChainBlock";
-import { getChain } from "@/lib/api";
+import { fetchChain, postLog } from "@/lib/api/client";
 import type { Chain, LogNode, LogType } from "@/lib/types/domain";
 
 // 유형별 입력 안내 — 거친 메모라도 정제 LLM이 뽑을 재료가 들어오게 유도
@@ -17,11 +18,42 @@ const guide: Record<LogType, { title: string; body: string }> = {
 
 const ROOT = "root";
 
+// 유형별 버튼 색: 성공 파랑 / 실패 빨강 / 참고 회색. 선택 시 채움, 미선택 시 옅은 바탕.
+const toneBtn: Record<LogType, { on: string; off: string }> = {
+  success: { on: "border-primary-700 bg-primary-700 text-white", off: "border-primary-200 bg-primary-100 text-primary-700 hover:bg-primary-200" },
+  fail: { on: "border-fail bg-fail text-white", off: "border-fail-bg bg-fail-bg text-fail hover:bg-[#f2c9c9]" },
+  ref: { on: "border-ref bg-ref text-white", off: "border-ref-bg bg-ref-bg text-ref hover:bg-[#d9dce5]" },
+};
+
 export function LogForm({ wsId, candidates }: { wsId: number; candidates: LogNode[] }) {
   const [type, setType] = useState<LogType>("fail");
   const [parent, setParent] = useState<string>(ROOT);
   const [resolveRoot, setResolveRoot] = useState(false);
   const [preview, setPreview] = useState<Chain | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  // 등록 → 타임라인으로 이동하며 방금 등록한 노드를 선택 상태로 연다 (URL ?entry= 가 선택 상태의 단일 출처)
+  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setBusy(true);
+    setError(null);
+    try {
+      const node = await postLog(wsId, {
+        type,
+        title: String(fd.get("title") ?? "").trim(),
+        body: String(fd.get("body") ?? "").trim(),
+        parent_id: parent === ROOT ? null : Number(parent),
+        resolve_root: resolveRoot,
+      });
+      router.push(`/w/${wsId}/timeline?entry=${node.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "등록 실패");
+      setBusy(false);
+    }
+  };
 
   // 상위 로그 선택 → 그 체인을 미리 보여줘 잘못된 연결을 줄인다. 선택 핸들러에서 로드(effect 내 setState 금지 규칙).
   const choose = (value: string) => {
@@ -30,13 +62,13 @@ export function LogForm({ wsId, candidates }: { wsId: number; candidates: LogNod
       setPreview(null);
       return;
     }
-    getChain(wsId, Number(value)).then((c) => setPreview(c));
+    fetchChain(wsId, Number(value)).then((c) => setPreview(c));
   };
 
   const parentNode = candidates.find((c) => String(c.id) === parent);
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={(e) => e.preventDefault()}>
+    <form className="flex flex-col gap-5" onSubmit={submit}>
       <Field label="로그 유형 (원클릭 태깅)">
         <div role="radiogroup" className="grid grid-cols-3 gap-2">
           {(["success", "fail", "ref"] as LogType[]).map((t) => (
@@ -46,10 +78,7 @@ export function LogForm({ wsId, candidates }: { wsId: number; candidates: LogNod
               role="radio"
               aria-checked={t === type}
               onClick={() => setType(t)}
-              className={cn(
-                "flex h-12 items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition-colors",
-                t === type ? "border-primary-700 bg-primary-700 text-white" : "border-border bg-card text-ink hover:bg-primary-100",
-              )}
+              className={cn("cursor-pointer flex h-12 items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition-colors", t === type ? toneBtn[t].on : toneBtn[t].off)}
             >
               <span className="size-2 rounded-full bg-current" />
               {typeLabel[t]}
@@ -107,8 +136,9 @@ export function LogForm({ wsId, candidates }: { wsId: number; candidates: LogNod
         <Button type="reset" variant="outline" size="lg" className="h-11 flex-1" onClick={() => { setType("fail"); setParent(ROOT); setPreview(null); setResolveRoot(false); }}>
           초기화
         </Button>
-        <Button type="submit" size="lg" className="h-11 flex-[2]">등록하고 AI 정제</Button>
+        <Button type="submit" size="lg" className="h-11 flex-[2]" disabled={busy}>{busy ? "등록 중…" : "등록하고 AI 정제"}</Button>
       </div>
+      {error && <p className="text-sm text-fail">{error}</p>}
     </form>
   );
 }
