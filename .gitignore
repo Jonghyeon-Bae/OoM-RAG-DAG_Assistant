@@ -42,4 +42,5 @@ next-env.d.ts
 
 # personal review / portfolio docs (not for team repo)
 /docs
-/.agent
+/.agent/
+/_to_delete/

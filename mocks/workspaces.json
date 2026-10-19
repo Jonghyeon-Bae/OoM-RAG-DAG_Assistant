@@ -1,0 +1,5 @@
+[
+  { "id": 1, "name": "SW 개발", "policy_enabled": false },
+  { "id": 2, "name": "인사·총무", "policy_enabled": true },
+  { "id": 3, "name": "고객지원(CS)", "policy_enabled": true }
+]
