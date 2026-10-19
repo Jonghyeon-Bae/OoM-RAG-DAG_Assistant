@@ -1,12 +1,12 @@
 import { Header } from "@/components/shell/Header";
-import { getWs } from "@/lib/ws";
+import { resolveWs } from "@/lib/ws";
 
 export default async function Page({ params }: { params: Promise<{ wsId: string }> }) {
-  const ws = await getWs(params);
+  const ws = await resolveWs(params);
   return (
     <>
-      <Header title="AI 어시스턴트" subtitle="1단계 정적 화면 — 작성 예정" wsName={ws.name} policyEnabled={ws.policy_enabled} />
-      <main className="p-8 text-ink-muted text-sm">AI 어시스턴트 화면은 FE-002 순서에 따라 다음에 구성합니다.</main>
+      <Header title="AI 어시스턴트" subtitle="FE-002 순서에 따라 다음에 구성" ws={ws} />
+      <main className="p-8 text-sm text-ink-muted">AI 어시스턴트 화면 작성 예정.</main>
     </>
   );
 }

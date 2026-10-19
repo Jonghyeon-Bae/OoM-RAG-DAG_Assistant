@@ -13,7 +13,6 @@
   --color-ink: #2b313a;
   --color-ink-muted: #6b7480;
   --color-surface: #ffffff;
-  --color-border: #e3e9f0;
   --color-fail-bg: #f8dada;
   --color-fail: #b23b3b;
   --color-success-bg: #d9efe3;
@@ -22,14 +21,7 @@
   --color-ref: #5c6475;
   --color-warn-bg: #fbebd2;
   --color-warn: #9a6418;
-  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
   --radius-card: 12px;
-}
-
-body {
-  background: var(--color-primary-50);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
 }
 
 @theme inline {
@@ -76,72 +68,39 @@ body {
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+  --background: #f2f7fc;
+  --foreground: #2b313a;
+  --card: #ffffff;
+  --card-foreground: #2b313a;
+  --popover: #ffffff;
+  --popover-foreground: #2b313a;
+  --primary: #2f5f8a;
+  --primary-foreground: #ffffff;
+  --secondary: #e1eef9;
+  --secondary-foreground: #2f5f8a;
+  --muted: #eef3f8;
+  --muted-foreground: #6b7480;
+  --accent: #e1eef9;
+  --accent-foreground: #2f5f8a;
+  --destructive: #b23b3b;
+  --border: #e3e9f0;
+  --input: #e3e9f0;
+  --ring: #8fbbe4;
+  --chart-1: #8fbbe4;
+  --chart-2: #c5ddf2;
+  --chart-3: #2f5f8a;
+  --chart-4: #a8d5ba;
+  --chart-5: #f0c7c7;
+  --radius: 0.75rem;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2b313a;
+  --sidebar-primary: #2f5f8a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e1eef9;
+  --sidebar-accent-foreground: #2f5f8a;
+  --sidebar-border: #e3e9f0;
+  --sidebar-ring: #8fbbe4;
 }
 
 @layer base {
@@ -153,5 +112,10 @@ body {
   }
   html {
     @apply font-sans;
+  }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href] {
+    cursor: pointer;
   }
 }

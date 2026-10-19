@@ -1,33 +1,30 @@
-import { Chip } from "@/components/ui";
+import { Chip, Avatar } from "@/components/ui";
+import type { Workspace } from "@/lib/types/domain";
 
 export function Header({
   title,
   subtitle,
-  wsName,
-  policyEnabled,
+  ws,
   right,
-  userInitial = "배",
+  userName = "배종현",
 }: {
   title: string;
   subtitle: string;
-  wsName: string;
-  policyEnabled: boolean;
+  ws: Workspace;
   right?: React.ReactNode;
-  userInitial?: string;
+  userName?: string;
 }) {
   return (
-    <header className="h-20 px-8 flex items-center justify-between border-b-2 border-primary-200 bg-surface">
+    <header className="flex h-20 items-center justify-between border-b-2 border-primary-200 bg-card px-8">
       <div>
         <h1 className="text-xl font-bold text-ink">{title}</h1>
-        <p className="text-sm text-ink-muted mt-0.5">{subtitle}</p>
+        <p className="mt-0.5 text-sm text-ink-muted">{subtitle}</p>
       </div>
       <div className="flex items-center gap-3">
-        <Chip tone="primary">{wsName}</Chip>
-        <Chip tone={policyEnabled ? "primary" : "neutral"}>{policyEnabled ? "규정 결합 모드" : "DAG 단일 모드"}</Chip>
+        <Chip tone="primary">{ws.name}</Chip>
+        <Chip tone={ws.policy_enabled ? "primary" : "neutral"}>{ws.policy_enabled ? "규정 결합 모드" : "DAG 단일 모드"}</Chip>
         {right}
-        <span className="w-10 h-10 rounded-full bg-primary-700 text-white flex items-center justify-center font-bold">
-          {userInitial}
-        </span>
+        <Avatar name={userName} />
       </div>
     </header>
   );

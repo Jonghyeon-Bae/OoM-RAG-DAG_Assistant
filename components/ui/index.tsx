@@ -1,84 +1,60 @@
-import Link from "next/link";
-import type { LogType } from "@/lib/fixtures";
-import { typeLabel } from "@/lib/fixtures";
+// 프로젝트 전용 래퍼. 기본 프리미티브는 shadcn(components/ui/*.tsx)을 쓴다.
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import type { LogType } from "@/lib/types/domain";
 
-type Cn = { className?: string };
+export { cn };
 
-export function cn(...parts: (string | false | undefined | null)[]) {
-  return parts.filter(Boolean).join(" ");
-}
+export const typeLabel: Record<LogType, string> = { fail: "실패", success: "성공", ref: "참고" };
 
-export function Card({ className, children }: Cn & { children: React.ReactNode }) {
+const typeTone: Record<LogType, string> = {
+  fail: "bg-fail-bg text-fail",
+  success: "bg-success-bg text-success",
+  ref: "bg-ref-bg text-ref",
+};
+
+export function TypeBadge({ type, className }: { type: LogType; className?: string }) {
   return (
-    <div className={cn("bg-surface border border-border rounded-card", className)}>{children}</div>
+    <Badge className={cn("h-6 gap-1.5 rounded-md px-2.5 font-semibold", typeTone[type], className)}>
+      <span className="size-1.5 rounded-full bg-current" />
+      {typeLabel[type]}
+    </Badge>
   );
 }
 
-export function Button({
-  variant = "primary",
+export function Chip({
+  tone = "neutral",
   className,
   children,
-  href,
-  type = "button",
-}: Cn & {
-  variant?: "primary" | "secondary" | "ghost";
+}: {
+  tone?: "neutral" | "primary" | "warn" | "fail" | "dark";
+  className?: string;
   children: React.ReactNode;
-  href?: string;
-  type?: "button" | "submit";
 }) {
-  const base =
-    "inline-flex items-center justify-center h-11 px-5 rounded-lg text-sm font-semibold transition-colors";
-  const styles = {
-    primary: "bg-primary-700 text-white hover:bg-[#27507a]",
-    secondary: "bg-surface text-ink border border-border hover:bg-primary-100",
-    ghost: "text-primary-700 hover:bg-primary-100",
-  }[variant];
-  if (href) {
-    return (
-      <Link href={href} className={cn(base, styles, className)}>
-        {children}
-      </Link>
-    );
-  }
-  return (
-    <button type={type} className={cn(base, styles, className)}>
-      {children}
-    </button>
-  );
-}
-
-export function Chip({ className, children, tone = "neutral" }: Cn & { children: React.ReactNode; tone?: "neutral" | "primary" | "warn" }) {
   const t = {
     neutral: "bg-ref-bg text-ref",
     primary: "bg-primary-100 text-primary-700",
     warn: "bg-warn-bg text-warn",
-  }[tone];
-  return <span className={cn("inline-flex items-center h-7 px-3 rounded-full text-xs font-medium", t, className)}>{children}</span>;
-}
-
-export function TypeBadge({ type, className }: { type: LogType } & Cn) {
-  const t = {
     fail: "bg-fail-bg text-fail",
-    success: "bg-success-bg text-success",
-    ref: "bg-ref-bg text-ref",
-  }[type];
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 h-6 px-2.5 rounded-md text-xs font-semibold", t, className)}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {typeLabel[type]}
-    </span>
-  );
+    dark: "bg-primary-700 text-white",
+  }[tone];
+  return <Badge className={cn("h-7 rounded-full px-3 font-medium", t, className)}>{children}</Badge>;
 }
 
-export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-sm text-ink-muted mb-2">{label}</span>
+      <span className="mb-2 block text-sm text-ink-muted">{label}</span>
       {children}
-      {hint && <span className="block text-xs text-ink-muted mt-1.5">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-xs text-ink-muted">{hint}</span>}
     </label>
   );
 }
 
-export const inputClass =
-  "w-full rounded-lg border border-border bg-surface px-4 py-3 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-primary-400";
+export function Avatar({ name, className }: { name: string; className?: string }) {
+  return (
+    <span className={cn("flex size-10 items-center justify-center rounded-full bg-primary-700 font-bold text-white", className)}>
+      {name[0]}
+    </span>
+  );
+}

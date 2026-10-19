@@ -1,0 +1,6 @@
+[
+  { "id": 1, "name": "배종현", "title": "팀장", "workspace_id": 1 },
+  { "id": 2, "name": "장문경", "title": "매니저", "workspace_id": 1 },
+  { "id": 3, "name": "신동준", "title": "주임", "workspace_id": 2 },
+  { "id": 4, "name": "홍경표", "title": "주임", "workspace_id": 3 }
+]
