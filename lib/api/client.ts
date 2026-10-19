@@ -36,3 +36,8 @@ export async function patchStatus(wsId: number, id: number, status: "active" | "
   const r = await fetch(`${base}/logs/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ status, reason }) });
   return r.ok ? r.json() : null;
 }
+
+export async function patchResolved(wsId: number, id: number, resolved: boolean): Promise<LogNode | null> {
+  const r = await fetch(`${base}/logs/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ resolved }) });
+  return r.ok ? r.json() : null;
+}

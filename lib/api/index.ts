@@ -16,7 +16,7 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function getLogs(wsId: number, opts: { type?: LogType | "all"; q?: string } = {}): Promise<{ items: LogNode[]; counts: LogCounts }> {
-  const all = store.nodes.filter((l) => l.workspace_id === wsId).map(settle);
+  const all = store.nodes.filter((l) => l.workspace_id === wsId).map(settle).map(withRoot);
   const counts: LogCounts = {
     all: all.length,
     fail: all.filter((l) => l.type === "fail").length,
@@ -88,9 +88,28 @@ function settle(n: StoreNode): LogNode {
   return n;
 }
 
+// 소속 루트 계산: 첫 부모를 따라 올라감 (다중 부모도 같은 루트에 속한다는 가정)
+function rootOf(id: number, seen = new Set<number>()): number {
+  if (seen.has(id)) return id;
+  seen.add(id);
+  const e = store.edges.find((x) => x.child_id === id);
+  return e ? rootOf(e.parent_id, seen) : id;
+}
+function withRoot(n: LogNode): LogNode {
+  return { ...n, root_id: rootOf(n.id) };
+}
+
+export async function setResolved(wsId: number, id: number, resolved: boolean): Promise<LogNode | null> {
+  const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
+  if (!n) return null;
+  if (rootOf(n.id) !== n.id) return null; // 루트만 완료 처리 가능
+  n.resolved_at = resolved ? new Date().toISOString() : null;
+  return withRoot(n);
+}
+
 export async function getLog(wsId: number, id: number): Promise<LogNode | null> {
   const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
-  return n ? settle(n) : null;
+  return n ? withRoot(settle(n)) : null;
 }
 
 export async function refineLog(wsId: number, id: number): Promise<LogNode | null> {
@@ -100,19 +119,19 @@ export async function refineLog(wsId: number, id: number): Promise<LogNode | nul
   n.refine_started_at = Date.now();
   n.keywords = [];
   n.resolution_summary = null;
-  return n;
+  return withRoot(n);
 }
 
 export async function setLogStatus(wsId: number, id: number, status: "active" | "deprecated"): Promise<LogNode | null> {
   const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
   if (!n) return null;
   n.status = status;
-  return n;
+  return withRoot(n);
 }
 
 export async function createLog(
   wsId: number,
-  input: { type: LogType; title: string; body: string; parent_id: number | null; author_name?: string },
+  input: { type: LogType; title: string; body: string; parent_id: number | null; author_name?: string; resolve_root?: boolean },
 ): Promise<LogNode> {
   const id = store.nextId++;
   const parent = input.parent_id ? store.nodes.find((n) => n.id === input.parent_id) : undefined;
@@ -131,9 +150,15 @@ export async function createLog(
     resolution_summary: null,
     refine_status: "pending",
     last_confirmed_at: null,
+    resolved_at: null,
+    root_id: id,
     created_at: new Date().toISOString(),
   };
   store.nodes.push(node);
   if (parent) store.edges.push({ parent_id: parent.id, child_id: id });
-  return node;
+  if (parent && input.resolve_root) {
+    const r = store.nodes.find((x) => x.id === rootOf(parent.id));
+    if (r) r.resolved_at = new Date().toISOString();
+  }
+  return withRoot(node);
 }
