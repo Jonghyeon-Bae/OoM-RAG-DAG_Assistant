@@ -19,7 +19,7 @@ export default async function LoginPage() {
             <section key={ws.id} className="rounded-xl border border-border bg-primary-50 p-5">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="font-semibold text-ink">{ws.name}</h2>
-                <Chip tone={ws.policy_enabled ? "primary" : "neutral"}>{ws.policy_enabled ? "규정 결합" : "DAG 단일"}</Chip>
+                <Chip tone={ws.policy_enabled ? "primary" : "neutral"}>{ws.policy_enabled ? "규정 + 해결 사례" : "해결 사례만"}</Chip>
               </div>
               <ul className="flex flex-col gap-2">
                 {users

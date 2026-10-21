@@ -19,7 +19,8 @@
     "refine_status": "done",
     "last_confirmed_at": "2026-10-09T05:20:00Z",
     "created_at": "2026-10-09T05:20:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 102,
@@ -29,7 +30,7 @@
     "title": "NTP 동기화로 토큰 만료 오류 해소",
     "body": "게이트웨이 서버 시간이 2분 어긋나 토큰이 만료 처리됨. NTP 동기화 후 토큰 재발급으로 해결.",
     "author_name": "신동준",
-    "path_label": "root.e403.cause2",
+    "path_label": "root.e403.cause2.fix1",
     "error_code": "E-403",
     "keywords": [
       "NTP",
@@ -40,7 +41,8 @@
     "refine_status": "done",
     "last_confirmed_at": "2026-10-08T08:05:00Z",
     "created_at": "2026-10-08T08:05:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 103,
@@ -50,7 +52,7 @@
     "title": "게이트웨이 인증 로그 확인 방법",
     "body": "/var/log/gw/auth.log 에서 token_expired 항목을 grep. 시간대 필터 예시 포함.",
     "author_name": "홍경표",
-    "path_label": "root.e403.cause2",
+    "path_label": "root.e403.cause2.ref1",
     "error_code": null,
     "keywords": [
       "게이트웨이",
@@ -61,7 +63,8 @@
     "refine_status": "done",
     "last_confirmed_at": null,
     "created_at": "2026-10-07T02:30:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 104,
@@ -82,7 +85,8 @@
     "refine_status": "done",
     "last_confirmed_at": null,
     "created_at": "2026-10-05T00:48:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 105,
@@ -103,7 +107,8 @@
     "refine_status": "done",
     "last_confirmed_at": "2026-10-02T07:12:00Z",
     "created_at": "2026-10-02T07:12:00Z",
-    "resolved_at": "2026-10-03T01:00:00Z"
+    "resolved_at": "2026-10-03T01:00:00Z",
+    "deprecated_via": null
   },
   {
     "id": 106,
@@ -124,7 +129,8 @@
     "refine_status": "done",
     "last_confirmed_at": "2026-10-09T05:20:00Z",
     "created_at": "2026-10-06T01:00:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 107,
@@ -144,7 +150,8 @@
     "refine_status": "done",
     "last_confirmed_at": null,
     "created_at": "2026-10-06T01:10:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 108,
@@ -164,7 +171,8 @@
     "refine_status": "done",
     "last_confirmed_at": "2026-10-09T05:20:00Z",
     "created_at": "2026-10-06T02:00:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 109,
@@ -184,7 +192,8 @@
     "refine_status": "done",
     "last_confirmed_at": "2026-09-20T00:00:00Z",
     "created_at": "2026-09-20T00:00:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   },
   {
     "id": 110,
@@ -194,7 +203,7 @@
     "title": "배포 체크리스트에 크론 확인 항목 추가",
     "body": "롤백 시 크론 유실 재발 방지용 체크리스트.",
     "author_name": "배종현",
-    "path_label": "root.e403.cause1",
+    "path_label": "root.e403.cause1.ref1",
     "error_code": null,
     "keywords": [
       "배포",
@@ -204,6 +213,7 @@
     "refine_status": "pending",
     "last_confirmed_at": null,
     "created_at": "2026-10-10T06:00:00Z",
-    "resolved_at": null
+    "resolved_at": null,
+    "deprecated_via": null
   }
 ]

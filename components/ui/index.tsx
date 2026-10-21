@@ -41,13 +41,15 @@ export function Chip({
   return <Badge className={cn("h-7 rounded-full px-3 font-medium", t, className)}>{children}</Badge>;
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+export function Field({ label, hint, children, htmlFor }: { label: string; hint?: string; children: React.ReactNode; htmlFor?: string }) {
+  // <label>로 감싸면 안의 첫 번째 버튼이 라벨 클릭에 반응한다(암묵적 연결). 입력 1개일 때만 htmlFor로 명시 연결.
+  const Title = htmlFor ? "label" : "span";
   return (
-    <label className="block">
-      <span className="mb-2 block text-sm text-ink-muted">{label}</span>
+    <div className="block">
+      <Title htmlFor={htmlFor} className="mb-2 block text-sm text-ink-muted">{label}</Title>
       {children}
       {hint && <span className="mt-1.5 block text-xs text-ink-muted">{hint}</span>}
-    </label>
+    </div>
   );
 }
 

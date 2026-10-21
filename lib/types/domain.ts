@@ -30,6 +30,7 @@ export interface LogNode {
   resolution_summary: string | null;
   refine_status: RefineStatus;
   last_confirmed_at: string | null;
+  deprecated_via: number | null; // 상위 폐기에 따라 함께 폐기된 경우 그 상위 id (복원 연동용)
   resolved_at: string | null; // 루트(장애 건) 완료 시각. 루트에만 의미 (TODO:04 쟁점 10)
   root_id: number; // 소속 장애 건의 루트 노드 id (서버 계산)
   created_at: string;

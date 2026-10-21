@@ -18,7 +18,7 @@ async function TimelineContent({
   const initialChain = await getChain(ws.id, initialEntry);
   return (
     <>
-      <Header title="트러블슈팅 타임라인" subtitle="실패·성공·참고 로그를 부모-자식 트리(DAG)로 연결해 보여줍니다" ws={ws} />
+      <Header title="트러블슈팅 타임라인" subtitle="장애 건마다 원인과 해결을 순서대로 모아 보여줍니다" ws={ws} />
       <TimelineView key={`${ws.id}-${initialEntry}`} wsId={ws.id} logs={items} initialEntry={initialEntry} initialChain={initialChain} />
     </>
   );

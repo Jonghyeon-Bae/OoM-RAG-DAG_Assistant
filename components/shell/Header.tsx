@@ -22,7 +22,7 @@ export function Header({
       </div>
       <div className="flex items-center gap-3">
         <Chip tone="primary">{ws.name}</Chip>
-        <Chip tone={ws.policy_enabled ? "primary" : "neutral"}>{ws.policy_enabled ? "규정 결합 모드" : "DAG 단일 모드"}</Chip>
+        <Chip tone={ws.policy_enabled ? "primary" : "neutral"}>{ws.policy_enabled ? "규정 + 해결 사례" : "해결 사례만"}</Chip>
         {right}
         <Avatar name={userName} />
       </div>
