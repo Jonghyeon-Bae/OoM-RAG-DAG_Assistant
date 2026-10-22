@@ -59,3 +59,8 @@ export interface Chain {
   edges: { parent_id: number; child_id: number }[];
   summary: string | null;
 }
+
+export interface PolicyRef {
+  ref: string; chunk_id: string; doc_id: number; doc_title: string; version: string;
+  article_label: string; page: number; text: string;
+}

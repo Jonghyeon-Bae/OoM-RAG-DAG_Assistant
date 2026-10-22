@@ -4,6 +4,8 @@ import type { Workspace, User, LogNode, LogCounts, Chain, ChainNode, LogType } f
 import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
 import { store, type StoreNode } from "@/lib/api/store";
+import policySeed from "@/mocks/policy_chunks.json";
+import type { PolicyRef } from "@/lib/types/domain";
 
 export async function getWorkspaces(): Promise<Workspace[]> {
   return workspaces as Workspace[];
@@ -161,4 +163,65 @@ export async function createLog(
     if (r) r.resolved_at = new Date().toISOString();
   }
   return withRoot(node);
+}
+
+export async function getPolicyChunks(wsId: number): Promise<PolicyRef[]> {
+  return (policySeed as (PolicyRef & { workspace_id: number })[]).filter((c) => c.workspace_id === wsId).map(({ workspace_id: _, ...c }) => c);
+}
+
+export interface MockAnswer {
+  query: string;
+  policy: PolicyRef[];
+  chain: Chain | null;
+  policy_text: string | null;
+  chain_text: string | null;
+  verified: string[];
+  unverified: string[];
+  total_ms: number | null;
+}
+
+export async function getMockAnswer(wsId: number, query: string): Promise<MockAnswer> {
+  const ws = await getWorkspace(wsId);
+  const policy = ws?.policy_enabled ? await getPolicyChunks(wsId) : [];
+
+  // hybrid_search_nodes 1단계(에러 코드 정확 일치)만 흉내. 워크스페이스 범위 엄수
+  const code = /([A-Z]{1,4}-?\d{3,4}|HTTP\s?\d{3})/i.exec(query)?.[0]?.toUpperCase() ?? null;
+  const entry = code
+    ? store.nodes.find((n) => n.workspace_id === wsId && n.error_code?.toUpperCase() === code && n.type === "fail" && n.status === "active")
+    : undefined;
+  const chain = entry ? await getChain(wsId, entry.id) : null;
+
+  // 마커: 규정 P1…, 체인 N1…(depth 순). Critic은 이 집합과 답변 속 마커를 대조한다
+  const nodes = chain ? [...chain.nodes].sort((a, b) => a.depth - b.depth || a.id - b.id) : [];
+  const nref = new Map(nodes.map((n, i) => [n.id, `N${i + 1}`]));
+  const mark = (id: number) => `[${nref.get(id)}]`;
+
+  const policy_text = policy.length
+    ? policy.map((p) => `${p.text.split("②")[0].replace(/^①\s*/, "").trim()} [${p.ref}]`).join(" ")
+    : null;
+
+  const fails = nodes.filter((n) => n.type === "fail");
+  const fixes = nodes.filter((n) => n.type === "success" && n.status === "active");
+  const head = fails[0] ?? nodes[0];
+  const chain_text = head
+    ? [
+        `${head.title} ${mark(head.id)}`,
+        fails.length > 1 ? `은(는) ${fails.slice(1).map((n) => `${n.title} ${mark(n.id)}`).join(", ")}이 원인으로 등록되어 있으며,` : "에 대해",
+        fixes.length ? `${fixes.map((n) => `${n.title} ${mark(n.id)}`).join(", ")}로 해소되었습니다.` : "아직 확인된 해결 로그가 없습니다.",
+      ].join(" ")
+    : null;
+
+  const used = [...new Set([...`${policy_text ?? ""} ${chain_text ?? ""}`.matchAll(/\[([PN]\d+)\]/g)].map((m) => m[1]))];
+  const known = new Set([...policy.map((p) => p.ref), ...nref.values()]);
+
+  return {
+    query,
+    policy,
+    chain,
+    policy_text,
+    chain_text,
+    verified: used.filter((r) => known.has(r)),
+    unverified: used.filter((r) => !known.has(r)),
+    total_ms: null, // 목업엔 생성 시간이 없다. 실제는 done.latency.total_ms
+  };
 }
