@@ -1,12 +1,14 @@
 import { Header } from "@/components/shell/Header";
+import { Chip } from "@/components/ui";
+import { AssistantScreen } from "@/components/blocks/AssistantScreen";
 import { resolveWs } from "@/lib/ws";
 
 export default async function Page({ params }: { params: Promise<{ wsId: string }> }) {
   const ws = await resolveWs(params);
   return (
     <>
-      <Header title="AI 어시스턴트" subtitle="FE-002 순서에 따라 다음에 구성" ws={ws} />
-      <main className="p-8 text-sm text-ink-muted">AI 어시스턴트 화면 작성 예정.</main>
+      <Header title="AI 어시스턴트" subtitle="공식 규정 근거와 실무 해결 노하우를 한 번에 답변합니다" ws={ws} right={<Chip>형태소 어휘 + 벡터 · RRF</Chip>} />
+      <AssistantScreen key={ws.id} ws={ws} />
     </>
   );
 }

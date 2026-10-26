@@ -6,5 +6,7 @@
   { "parent_id": 107, "child_id": 102 },
   { "parent_id": 107, "child_id": 103 },
   { "parent_id": 106, "child_id": 109 },
-  { "parent_id": 106, "child_id": 110 }
+  { "parent_id": 106, "child_id": 110 },
+  { "parent_id": 111, "child_id": 112 },
+  { "parent_id": 112, "child_id": 113 }
 ]
