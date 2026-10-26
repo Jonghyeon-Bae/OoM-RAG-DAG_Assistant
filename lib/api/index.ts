@@ -1,8 +1,10 @@
 // 데이터 접근 단일 지점(서버). 지금은 메모리 목업, 3단계에서 Spring/Python 호출로 교체한다.
 // 클라이언트 컴포넌트는 lib/api/client.ts 를 통해 app/api/mock/* 라우트를 호출한다.
-import type { Workspace, User, LogNode, LogCounts, Chain, ChainNode, LogType } from "@/lib/types/domain";
+import type { Workspace, User, LogNode, LogCounts, Chain, ChainNode, LogType, DashboardSummary, PolicyDocument, PolicyChunk, DocStatus, DocEvent, DocEventAction } from "@/lib/types/domain";
+import chunksSeed from "@/mocks/chunks.json";
 import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
+import { connection } from "next/server";
 import { store, type StoreNode } from "@/lib/api/store";
 
 export async function getWorkspaces(): Promise<Workspace[]> {
@@ -16,6 +18,7 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function getLogs(wsId: number, opts: { type?: LogType | "all"; q?: string } = {}): Promise<{ items: LogNode[]; counts: LogCounts }> {
+  await connection(); // Date.now() 기반 목업 상태 전이는 요청 시점에만 (Cache Components 프리렌더 제외)
   const all = store.nodes.filter((l) => l.workspace_id === wsId).map(settle).map(withRoot);
   const counts: LogCounts = {
     all: all.length,
@@ -37,6 +40,7 @@ export async function getRecentLogs(wsId: number, limit = 5): Promise<LogNode[]>
 }
 
 export async function getWeeklyCount(wsId: number): Promise<number> {
+  await connection(); // Date.now() 기반 목업 상태 전이는 요청 시점에만 (Cache Components 프리렌더 제외)
   // TODO:04 백엔드 집계(쟁점 2). 목업: 최근 7일 등록 수
   const since = Date.now() - 7 * 86400_000;
   return store.nodes.filter((l) => l.workspace_id === wsId && Date.parse(l.created_at) >= since).length;
@@ -44,6 +48,7 @@ export async function getWeeklyCount(wsId: number): Promise<number> {
 
 // get_chain(ws, entry, max_depth=3): 조상(음수 depth)·자손(양수 depth). 04 §3.3 의미와 동일
 export async function getChain(wsId: number, entryId: number, maxDepth = 3): Promise<Chain | null> {
+  await connection(); // Date.now() 기반 목업 상태 전이는 요청 시점에만 (Cache Components 프리렌더 제외)
   const byId = new Map(store.nodes.filter((n) => n.workspace_id === wsId).map((n) => [n.id, n]));
   if (!byId.has(entryId)) return null;
   const depth = new Map<number, number>([[entryId, 0]]);
@@ -108,6 +113,7 @@ export async function setResolved(wsId: number, id: number, resolved: boolean): 
 }
 
 export async function getLog(wsId: number, id: number): Promise<LogNode | null> {
+  await connection(); // Date.now() 기반 목업 상태 전이는 요청 시점에만 (Cache Components 프리렌더 제외)
   const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
   return n ? withRoot(settle(n)) : null;
 }
@@ -122,11 +128,47 @@ export async function refineLog(wsId: number, id: number): Promise<LogNode | nul
   return withRoot(n);
 }
 
-export async function setLogStatus(wsId: number, id: number, status: "active" | "deprecated"): Promise<LogNode | null> {
+// 폐기/복원. cascade=true면 "이 노드를 거치지 않고는 활성 조상에 닿을 수 없는" 자손도 함께 폐기한다 (다중 부모로 다른 활성 경로가 있으면 제외).
+export async function setLogStatus(wsId: number, id: number, status: "active" | "deprecated", cascade = false): Promise<{ node: LogNode; affected: number[] } | null> {
   const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
   if (!n) return null;
-  n.status = status;
-  return withRoot(n);
+  const affected: number[] = [];
+  if (status === "deprecated") {
+    n.status = "deprecated";
+    n.deprecated_via = null;
+    if (cascade) {
+      for (const d of orphanedBy(id)) {
+        const c = store.nodes.find((x) => x.id === d)!;
+        if (c.status === "active") { c.status = "deprecated"; c.deprecated_via = id; affected.push(d); }
+      }
+    }
+  } else {
+    n.status = "active";
+    n.deprecated_via = null;
+    // 이 노드 폐기로 함께 폐기됐던 자손만 복원
+    store.nodes.filter((x) => x.deprecated_via === id).forEach((c) => { c.status = "active"; c.deprecated_via = null; affected.push(c.id); });
+  }
+  return { node: withRoot(n), affected };
+}
+
+// id를 폐기했을 때 활성 조상 경로를 전부 잃는 자손 집합
+export function orphanedBy(id: number): number[] {
+  const children = (p: number) => store.edges.filter((e) => e.parent_id === p).map((e) => e.child_id);
+  const parents = (c: number) => store.edges.filter((e) => e.child_id === c).map((e) => e.parent_id);
+  const dead = new Set<number>([id]);
+  const queue = [...children(id)];
+  while (queue.length) {
+    const c = queue.shift()!;
+    if (dead.has(c)) continue;
+    const node = store.nodes.find((x) => x.id === c);
+    if (!node || node.status === "deprecated") continue;
+    const hasLiveParent = parents(c).some((p) => !dead.has(p) && store.nodes.find((x) => x.id === p)?.status === "active");
+    if (hasLiveParent) continue;
+    dead.add(c);
+    queue.push(...children(c));
+  }
+  dead.delete(id);
+  return [...dead];
 }
 
 export async function createLog(
@@ -134,7 +176,9 @@ export async function createLog(
   input: { type: LogType; title: string; body: string; parent_id: number | null; author_name?: string; resolve_root?: boolean },
 ): Promise<LogNode> {
   const id = store.nextId++;
-  const parent = input.parent_id ? store.nodes.find((n) => n.id === input.parent_id) : undefined;
+  const parent = input.parent_id ? store.nodes.find((n) => n.id === input.parent_id && n.workspace_id === wsId) : undefined;
+  if (input.parent_id && !parent) throw new Error("PARENT_NOT_FOUND");
+  if (parent?.status === "deprecated") throw new Error("PARENT_DEPRECATED");
   const node: StoreNode = {
     id,
     refine_started_at: Date.now(),
@@ -150,6 +194,7 @@ export async function createLog(
     resolution_summary: null,
     refine_status: "pending",
     last_confirmed_at: null,
+    deprecated_via: null,
     resolved_at: null,
     root_id: id,
     created_at: new Date().toISOString(),
@@ -161,4 +206,79 @@ export async function createLog(
     if (r) r.resolved_at = new Date().toISOString();
   }
   return withRoot(node);
+}
+
+// 대시보드 요약 — 로그 집계는 저장소 실시간, 탐색 시간·평가는 실측 전 예시값(is_sample)
+export async function getDashboardSummary(wsId: number): Promise<DashboardSummary> {
+  await connection();
+  const all = store.nodes.filter((l) => l.workspace_id === wsId).map(settle).map(withRoot);
+  const roots = all.filter((l) => l.id === l.root_id);
+  const since = Date.now() - 7 * 86400_000;
+  return {
+    is_sample: true,
+    search_time: {
+      before_min: 5.5,
+      after_min: 1.4,
+      by_intent: [
+        { intent: "policy", before_min: 3.8, after_min: 0.9 },
+        { intent: "troubleshoot", before_min: 5.6, after_min: 1.5 },
+        { intent: "both", before_min: 7.2, after_min: 1.8 },
+      ],
+    },
+    eval: { faithfulness: 0.94, answer_relevance: 0.91, dataset_version: "sample", run_at: null },
+    logs: {
+      total: all.length,
+      week: all.filter((l) => Date.parse(l.created_at) >= since).length,
+      open_roots: roots.filter((r) => !r.resolved_at && r.status === "active").length,
+      resolved_roots: roots.filter((r) => !!r.resolved_at).length,
+      refine_failed: all.filter((l) => l.refine_status === "failed").length,
+    },
+    feedback: { up: 0, down: 0 },
+    latency_ms: { retrieval: null, first_token: null, total: null },
+  };
+}
+
+// ---- 규정 문서 (Spring 소유: status·삭제. 인덱싱은 Python 스크립트)
+export async function getDocuments(wsId: number): Promise<PolicyDocument[]> {
+  return store.docs.filter((d) => d.workspace_id === wsId).sort((a, b) => a.title.localeCompare(b.title) || b.indexed_at.localeCompare(a.indexed_at));
+}
+
+function logDocEvent(d: PolicyDocument, action: DocEventAction, actor: string, reason: string | null) {
+  store.docEvents.push({ id: store.docEvents.length + 1, workspace_id: d.workspace_id, document_id: d.id, document_label: `${d.title} ${d.version}`, action, actor, source: "ui", reason, at: new Date().toISOString() });
+}
+
+export async function setDocumentStatus(wsId: number, id: number, status: DocStatus, actor: string, reason?: string): Promise<PolicyDocument | null> {
+  const d = store.docs.find((x) => x.id === id && x.workspace_id === wsId);
+  if (!d) return null;
+  d.status = status;
+  d.retired_at = status === "retired" ? new Date().toISOString() : null;
+  d.retire_reason = status === "retired" ? (reason ?? null) : null;
+  d.retired_by = status === "retired" ? actor : null;
+  logDocEvent(d, status === "retired" ? "retired" : "restored", actor, reason ?? null);
+  return d;
+}
+
+// 삭제는 retired 상태에서만. 청크·파일은 서버가 함께 제거(CASCADE). 실행자는 purge_document() (ARCH-003 #2)
+export async function deleteDocument(wsId: number, id: number, actor: string): Promise<"ok" | "not_found" | "not_retired"> {
+  const i = store.docs.findIndex((x) => x.id === id && x.workspace_id === wsId);
+  if (i < 0) return "not_found";
+  if (store.docs[i].status !== "retired") return "not_retired";
+  logDocEvent(store.docs[i], "deleted", actor, null);
+  store.docs.splice(i, 1);
+  return "ok";
+}
+
+export async function getDocumentChunks(wsId: number, id: number): Promise<PolicyChunk[] | null> {
+  const d = store.docs.find((x) => x.id === id && x.workspace_id === wsId);
+  if (!d) return null;
+  const all = chunksSeed as Record<string, PolicyChunk[]>;
+  return all[d.slug] ?? [];
+}
+
+// 이력. document_id 없으면 워크스페이스 전체(삭제된 문서 포함). 실서버: audit_log(S8) 읽기
+export async function getDocumentEvents(wsId: number, documentId?: number, limit = 30): Promise<DocEvent[]> {
+  return store.docEvents
+    .filter((e) => e.workspace_id === wsId && (!documentId || e.document_id === documentId))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, limit);
 }

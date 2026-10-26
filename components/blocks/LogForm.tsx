@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, TypeBadge, typeLabel, cn } from "@/components/ui";
 import { ChainBlock } from "@/components/blocks/ChainBlock";
+import { ParentPicker, ROOT } from "@/components/blocks/ParentPicker";
 import { fetchChain, postLog } from "@/lib/api/client";
 import type { Chain, LogNode, LogType } from "@/lib/types/domain";
 
@@ -15,8 +16,6 @@ const guide: Record<LogType, { title: string; body: string }> = {
   ref: { title: "예: 게이트웨이 인증 로그 확인 방법", body: "절차·명령어·링크 등 다음 사람이 그대로 따라 할 수 있는 내용." },
 };
 
-const ROOT = "root";
-
 // 유형별 버튼 색: 성공 파랑 / 실패 빨강 / 참고 회색. 선택 시 채움, 미선택 시 옅은 바탕.
 const toneBtn: Record<LogType, { on: string; off: string }> = {
   success: { on: "border-success bg-success text-white", off: "border-success-bg bg-success-bg text-success hover:bg-[#c9def5]" },
@@ -24,11 +23,12 @@ const toneBtn: Record<LogType, { on: string; off: string }> = {
   ref: { on: "border-ref bg-ref text-white", off: "border-ref-bg bg-ref-bg text-ref hover:bg-[#d9dce5]" },
 };
 
-export function LogForm({ wsId, candidates, onCreated }: { wsId: number; candidates: LogNode[]; onCreated?: (n: LogNode) => void }) {
+export function LogForm({ wsId, candidates, onCreated, initialParent, initialPreview }: { wsId: number; candidates: LogNode[]; onCreated?: (n: LogNode) => void; initialParent?: string; initialPreview?: Chain | null }) {
   const [type, setType] = useState<LogType>("fail");
-  const [parent, setParent] = useState<string>(ROOT);
+  const [parent, setParent] = useState<string>(initialParent && candidates.some((c) => String(c.id) === initialParent) ? initialParent : ROOT);
+  const [title, setTitle] = useState("");
   const [resolveRoot, setResolveRoot] = useState(false);
-  const [preview, setPreview] = useState<Chain | null>(null);
+  const [preview, setPreview] = useState<Chain | null>(initialPreview ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +49,7 @@ export function LogForm({ wsId, candidates, onCreated }: { wsId: number; candida
       });
       onCreated?.(node);
       form.reset();
+      setTitle("");
       setType("fail");
       setParent(ROOT);
       setPreview(null);
@@ -91,37 +92,27 @@ export function LogForm({ wsId, candidates, onCreated }: { wsId: number; candida
           ))}
         </div>
         <input type="hidden" name="type" value={type} />
+        <p className="mt-2 text-xs text-ink-muted">
+          <b className="text-success">성공</b> 해결했다 · <b className="text-fail">실패</b> 문제나 원인을 발견했다 · <b className="text-ref">참고</b> 절차·자료를 남긴다
+        </p>
       </Field>
 
-      <Field label="제목">
-        <Input name="title" className="h-11" placeholder={guide[type].title} required />
+      <Field label="제목" htmlFor="log-title">
+        <Input id="log-title" name="title" className="h-11" placeholder={guide[type].title} required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
-      <Field label="내용">
-        <Textarea name="body" className="min-h-[120px]" placeholder={guide[type].body} required />
+      <Field label="내용" htmlFor="log-body">
+        <Textarea id="log-body" name="body" className="min-h-[120px]" placeholder={guide[type].body} required />
       </Field>
 
-      <Field label="상위 로그 연결 (DAG 부모)" hint="목록에서만 선택합니다. 새 장애의 시작이면 '최초 등록'을 그대로 두세요.">
-        <select
-          name="parent_id"
-          value={parent}
-          onChange={(e) => choose(e.target.value)}
-          className="h-11 w-full rounded-lg border border-border bg-card px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary-400"
-        >
-          <option value={ROOT}>최초 등록 — 새 장애 시작점 (상위 없음)</option>
-          {candidates.map((c) => (
-            <option key={c.id} value={c.id} disabled={c.status === "deprecated"}>
-              [{typeLabel[c.type]}] {c.title} · {c.path_label}
-              {c.status === "deprecated" ? " (폐기)" : ""}
-            </option>
-          ))}
-        </select>
+      <Field label="어디에 이어서 적나요?" hint={initialParent ? undefined : "새 문제면 '새 장애 건 시작', 이미 있는 문제면 그 장애 건을 고르세요."}>
+        <ParentPicker candidates={candidates} value={parent} onChange={choose} titleHint={title} chain={preview} />
       </Field>
 
       {preview && parentNode && (
         <div className="rounded-xl bg-primary-50 p-4">
           <div className="mb-2 flex items-center gap-2 text-xs text-ink-muted">
             <TypeBadge type={parentNode.type} />
-            <span>이 로그가 연결될 체인 미리보기 — 새 로그는 <b className="text-ink">{parentNode.title}</b> 아래에 들어갑니다</span>
+            <span>이 흐름에 이어집니다 — 새 로그는 <b className="text-ink">{parentNode.title}</b> 다음에 들어갑니다</span>
           </div>
           <ChainBlock chain={preview} compact selectedId={parentNode.id} />
         </div>
@@ -131,17 +122,17 @@ export function LogForm({ wsId, candidates, onCreated }: { wsId: number; candida
         <label className="flex items-start gap-3 rounded-lg border border-success-bg bg-success-bg/40 p-3 text-sm">
           <input type="checkbox" name="resolve_root" checked={resolveRoot} onChange={(e) => setResolveRoot(e.target.checked)} className="mt-0.5 size-4 accent-[var(--color-success)]" />
           <span>
-            <span className="font-semibold text-success">이 성공 로그로 루트 장애를 완료 처리</span>
-            <span className="mt-0.5 block text-xs text-ink-muted">체인의 시작 노드에 완료 표시가 붙고, 타임라인에서 &ldquo;완료&rdquo; 필터로 볼 수 있습니다. 나중에 타임라인에서도 바꿀 수 있습니다.</span>
+            <span className="font-semibold text-success">이 성공으로 장애 건을 완료 처리</span>
+            <span className="mt-0.5 block text-xs text-ink-muted">장애 건에 완료 표시가 붙습니다. 타임라인에서 언제든 되돌릴 수 있습니다.</span>
           </span>
         </label>
       )}
 
       <div className="flex gap-3 pt-1">
-        <Button type="reset" variant="outline" size="lg" className="h-11 flex-1" onClick={() => { setType("fail"); setParent(ROOT); setPreview(null); setResolveRoot(false); }}>
+        <Button type="reset" variant="outline" size="lg" className="h-11 flex-1" onClick={() => { setType("fail"); setTitle(""); setParent(ROOT); setPreview(null); setResolveRoot(false); }}>
           초기화
         </Button>
-        <Button type="submit" size="lg" className="h-11 flex-[2]" disabled={busy}>{busy ? "등록 중…" : "등록하고 AI 정제"}</Button>
+        <Button type="submit" size="lg" className="h-11 flex-[2]" disabled={busy}>{busy ? "등록 중…" : "등록하고 AI 정리"}</Button>
       </div>
       {error && <p className="text-sm text-fail">{error}</p>}
     </form>

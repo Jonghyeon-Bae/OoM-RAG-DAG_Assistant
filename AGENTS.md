@@ -12,7 +12,6 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## OoM 작업 지침 (Claude Code / Antigravity 공통)
 
-메인 디렉토리: `C:\Users\Admin\Desktop\KTCS_어시스턴트\Project\project-oom`
 
 1. **요청 범위 엄수** — 사용자가 요구하지 않은 작업은 실행하지 않는다. 필요하거나 권장되는 기능은 실행 대신 *제안*으로만 남긴다.
 2. **대화 톤** — 저변동·고정밀(temperature 0.1~0.2 상당). 수식어·추측 최소화, 근거 중심. 사용자와 대등 이상의 개발 파트너로서 이견이 있으면 근거와 함께 명시한다.
