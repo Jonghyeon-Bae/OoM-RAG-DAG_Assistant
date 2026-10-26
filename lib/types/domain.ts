@@ -64,3 +64,32 @@ export interface PolicyRef {
   ref: string; chunk_id: string; doc_id: number; doc_title: string; version: string;
   article_label: string; page: number; text: string;
 }
+
+// ── SSE 이벤트 (04 §4.3). Pydantic → gen_sse_types.py 생성본이 생기면 교체 ──
+export type Intent = "policy" | "troubleshoot" | "both";
+export type Mode = "policy" | "dag_only";
+export type StageNode = "supervisor" | "policy_rag" | "graph_search" | "gate" | "generate" | "critic";
+export type StageStatus = "start" | "done" | "error";
+
+export interface ChainEventNode {
+  ref: string; id: number; type: LogType; status: LogStatus; title: string;
+  depth: number; path_label: string; last_confirmed_at: string | null;
+}
+export interface ChainEvent { entry_id: number; nodes: ChainEventNode[]; edges: { parent_id: number; child_id: number }[] }
+export interface CitationsEvent { verified: string[]; unverified: string[] }
+export interface DoneEvent {
+  intent: Intent; retrieved_ids: string[]; verified_ids: string[]; unverified_ids: string[];
+  latency: { retrieval_ms: number; first_token_ms: number; total_ms: number };
+  model: string; prompt_tokens: number; completion_tokens: number;
+}
+
+export type ChatEvent =
+  | { event: "session"; data: { session_id: number } }
+  | { event: "stage"; data: { node: StageNode; status: StageStatus; detail?: string } }
+  | { event: "intent"; data: { intent: Intent; mode: Mode } }
+  | { event: "policy"; data: PolicyRef[] }
+  | { event: "chain"; data: ChainEvent }
+  | { event: "token"; data: { text: string } }
+  | { event: "citations"; data: CitationsEvent }
+  | { event: "done"; data: DoneEvent }
+  | { event: "error"; data: { message: string; node?: StageNode } };

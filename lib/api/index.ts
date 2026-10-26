@@ -5,7 +5,7 @@ import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
 import { store, type StoreNode } from "@/lib/api/store";
 import policySeed from "@/mocks/policy_chunks.json";
-import type { PolicyRef } from "@/lib/types/domain";
+import type { PolicyRef, ChatEvent, Intent, Mode } from "@/lib/types/domain";
 
 export async function getWorkspaces(): Promise<Workspace[]> {
   return workspaces as Workspace[];
@@ -165,10 +165,21 @@ export async function createLog(
   return withRoot(node);
 }
 
-export async function getPolicyChunks(wsId: number): Promise<PolicyRef[]> {
-  return (policySeed as (PolicyRef & { workspace_id: number })[]).filter((c) => c.workspace_id === wsId).map(({ workspace_id: _, ...c }) => c);
+// 질문과 청크의 단어 겹침으로 점수. hybrid_search_chunks() 어휘 검색의 거친 흉내 (목업 전용)
+export async function getPolicyChunks(wsId: number, query = ""): Promise<PolicyRef[]> {
+  const all = (policySeed as (PolicyRef & { workspace_id: number })[]).filter((c) => c.workspace_id === wsId);
+  const words = query.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((w) => w.length >= 2);
+  if (!words.length) return all;
+  return all
+    .map((c) => {
+      const hay = `${c.doc_title} ${c.article_label} ${c.text}`.toLowerCase();
+      return { c, score: words.filter((w) => hay.includes(w)).length };
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map((x, i) => ({ ...x.c, ref: `P${i + 1}` }));   // 마커는 순위대로 다시 부여
 }
-
 export interface MockAnswer {
   query: string;
   policy: PolicyRef[];
@@ -178,11 +189,12 @@ export interface MockAnswer {
   verified: string[];
   unverified: string[];
   total_ms: number | null;
+  chain_refs: { id: number; ref: string }[];
 }
 
 export async function getMockAnswer(wsId: number, query: string): Promise<MockAnswer> {
   const ws = await getWorkspace(wsId);
-  const policy = ws?.policy_enabled ? await getPolicyChunks(wsId) : [];
+  const policy = ws?.policy_enabled ? await getPolicyChunks(wsId, query) : [];
 
   // hybrid_search_nodes 1단계(에러 코드 정확 일치)만 흉내. 워크스페이스 범위 엄수
   const code = /([A-Z]{1,4}-?\d{3,4}|HTTP\s?\d{3})/i.exec(query)?.[0]?.toUpperCase() ?? null;
@@ -223,5 +235,101 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
     verified: used.filter((r) => known.has(r)),
     unverified: used.filter((r) => !known.has(r)),
     total_ms: null, // 목업엔 생성 시간이 없다. 실제는 done.latency.total_ms
+    chain_refs: nodes.map((n) => ({ id: n.id, ref: nref.get(n.id)! })), 
+  };
+}
+
+// ── 어시스턴트 목업 SSE 이벤트 생성기 (04 §4.3 9종). 라우트는 이걸 그대로 흘려보내기만 한다.
+// 실제: Spring 이 session 송출, Python LangGraph 가 나머지 송출, Spring 이 done 을 가로채 세션 기록.
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let mockSession = 1000;
+
+export async function* mockChatEvents(wsId: number, query: string): AsyncGenerator<ChatEvent> {
+  const t0 = Date.now();
+  const ws = await getWorkspace(wsId);
+  const mode: Mode = ws?.policy_enabled ? "policy" : "dag_only";
+
+  yield { event: "session", data: { session_id: ++mockSession } };
+
+  // supervisor — DAG 단일은 분류 생략, 규정 결합은 LLM 분류 1회 흉내
+  yield { event: "stage", data: { node: "supervisor", status: "start" } };
+  if (mode === "policy") await sleep(300);
+  const a = await getMockAnswer(wsId, query);
+  const intent: Intent =
+    mode === "dag_only" ? "troubleshoot" : a.policy.length && a.chain ? "both" : a.policy.length ? "policy" : a.chain ? "troubleshoot" : "both";
+  yield { event: "stage", data: { node: "supervisor", status: "done", detail: mode === "dag_only" ? "분류 생략" : undefined } };
+  yield { event: "intent", data: { intent, mode } };
+
+  // Worker A ∥ B — 검색 결과를 생성 전에 선송출
+  if (mode === "policy" && intent !== "troubleshoot") {
+    yield { event: "stage", data: { node: "policy_rag", status: "start" } };
+    await sleep(250);
+    if (a.policy.length) yield { event: "policy", data: a.policy };
+    yield { event: "stage", data: { node: "policy_rag", status: "done" } };
+  }
+  if (intent !== "policy") {
+    yield { event: "stage", data: { node: "graph_search", status: "start" } };
+    await sleep(250);
+    if (a.chain) {
+      const ref = new Map(a.chain_refs.map((r) => [r.id, r.ref]));
+      yield {
+        event: "chain",
+        data: {
+          entry_id: a.chain.entry_id,
+          edges: a.chain.edges,
+          nodes: a.chain.nodes.map((n) => ({
+            ref: ref.get(n.id)!, id: n.id, type: n.type, status: n.status, title: n.title,
+            depth: n.depth, path_label: n.path_label, last_confirmed_at: n.last_confirmed_at,
+          })),
+        },
+      };
+    }
+    yield { event: "stage", data: { node: "graph_search", status: "done" } };
+  }
+  const retrieval_ms = Date.now() - t0;
+
+  // gate — 0건이면 LLM 미호출
+  yield { event: "stage", data: { node: "gate", status: "start" } };
+  const hasContext = a.policy.length > 0 || !!a.chain;
+  yield { event: "stage", data: { node: "gate", status: "done", detail: hasContext ? undefined : "근거 없음" } };
+
+  const text = hasContext
+    ? [a.policy_text && `## 규정 근거\n${a.policy_text}`, a.chain_text && `## 유사 장애 해결 사례 (DAG 체인)\n${a.chain_text}`].filter(Boolean).join("\n\n")
+    : "등록된 규정이나 과거 해결 사례에서 이 질문의 근거를 찾지 못했습니다. 질문을 바꾸거나 관련 로그를 먼저 등록해 주세요.";
+
+  // generate — 토큰 스트리밍 흉내
+  let first_token_ms = 0;
+  if (hasContext) yield { event: "stage", data: { node: "generate", status: "start" } };
+  for (let i = 0; i < text.length; i += 4) {
+    if (!first_token_ms) first_token_ms = Date.now() - t0;
+    yield { event: "token", data: { text: text.slice(i, i + 4) } };
+    await sleep(15);
+  }
+  if (hasContext) yield { event: "stage", data: { node: "generate", status: "done" } };
+
+  // critic — LLM 미사용, 마커 대조 (getMockAnswer 가 이미 계산)
+  if (hasContext) {
+    yield { event: "stage", data: { node: "critic", status: "start" } };
+    yield { event: "citations", data: { verified: a.verified, unverified: a.unverified } };
+    yield { event: "stage", data: { node: "critic", status: "done" } };
+  } else {
+    yield { event: "citations", data: { verified: [], unverified: [] } };
+  }
+
+  // done — Spring 이 가로채 search_sessions UPDATE
+  const refToId = new Map<string, string>([
+    ...a.policy.map((p) => [p.ref, p.chunk_id] as const),
+    ...a.chain_refs.map((r) => [r.ref, String(r.id)] as const),
+  ]);
+  yield {
+    event: "done",
+    data: {
+      intent,
+      retrieved_ids: [...refToId.values()],
+      verified_ids: a.verified.map((r) => refToId.get(r)!),
+      unverified_ids: a.unverified,
+      latency: { retrieval_ms, first_token_ms, total_ms: Date.now() - t0 },
+      model: "mock", prompt_tokens: 0, completion_tokens: Math.ceil(text.length / 2),
+    },
   };
 }
