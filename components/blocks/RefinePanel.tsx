@@ -10,7 +10,7 @@ import type { LogNode, RefineStatus } from "@/lib/types/domain";
 
 const stages: { key: RefineStatus; label: string }[] = [
   { key: "pending", label: "접수" },
-  { key: "processing", label: "LLM 정제·임베딩" },
+  { key: "processing", label: "AI 정리 중" },
   { key: "done", label: "검색 가능" },
 ];
 const order: Record<RefineStatus, number> = { pending: 0, processing: 1, done: 2, failed: 2 };
@@ -48,11 +48,10 @@ function Result({ n }: { n: LogNode }) {
       <dd className="flex flex-wrap gap-1.5">
         {n.refine_status === "done" ? (
           <>
-            <Chip tone="primary">pgvector 임베딩 완료</Chip>
-            <Chip tone="primary">DAG {n.path_label}</Chip>
+            <Chip tone="primary">검색 가능</Chip>
           </>
         ) : (
-          <span className="text-ink-muted">정제 완료 후 적재</span>
+          <span className="text-ink-muted">정리가 끝나면 검색에 포함됩니다</span>
         )}
       </dd>
     </dl>
@@ -102,8 +101,8 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
       {/* 현재 등록 건의 정제 진행 */}
       <Card className="p-6">
         <div className="mb-4 flex items-center gap-3">
-          <Chip tone="dark">LLM 자동 정제</Chip>
-          <span className="text-sm text-ink-muted">등록한 메모를 에러 코드·키워드·요약으로 바꿔 검색 가능한 지식으로 만듭니다</span>
+          <Chip tone="dark">AI 정리</Chip>
+          <span className="text-sm text-ink-muted">등록한 메모에서 에러 코드·키워드·요약을 뽑아 검색되게 만듭니다</span>
         </div>
         {current ? (
           <>
@@ -120,21 +119,21 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
                 <Link href={`/w/${wsId}/timeline?entry=${current.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-700 px-3 text-sm font-semibold text-white hover:bg-[#27507a]">
                   <ExternalLink className="size-4" /> 타임라인에서 보기
                 </Link>
-                <Button variant="outline" size="lg" onClick={() => refine(current.id)} disabled={busyId === current.id} title="원본은 그대로 두고 AI 정제만 다시 실행"><RefreshCw className="size-4" /> 재정제</Button>
-                <Button variant="outline" size="lg" onClick={() => deprecate(current.id)} disabled={busyId === current.id} title="검색에서 제외 (원본 보존, 복원 가능)" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-4" /> 폐기</Button>
+                <Button variant="outline" size="lg" onClick={() => refine(current.id)} disabled={busyId === current.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다"><RefreshCw className="size-4" /> 다시 정리</Button>
+                <Button variant="outline" size="lg" onClick={() => deprecate(current.id)} disabled={busyId === current.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-4" /> 폐기</Button>
               </div>
             )}
           </>
         ) : (
           <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-ink-muted">
-            왼쪽에서 로그를 등록하면 접수 → LLM 정제·임베딩 → 검색 가능 순서로 진행 상황과 추출 결과가 여기에 표시됩니다.
+            왼쪽에서 로그를 등록하면 접수 → AI 정리 → 검색 가능 순서로 진행 상황과 뽑아낸 결과가 여기에 표시됩니다.
           </div>
         )}
       </Card>
 
       {/* 최근 정제 결과 타임라인 */}
       <Card className="p-6">
-        <h3 className="mb-4 font-semibold text-ink">최근 정제 결과</h3>
+        <h3 className="mb-4 font-semibold text-ink">최근 등록한 로그</h3>
         <ol className="relative ml-2 border-l border-border pl-5">
           {recent.map((n) => (
             <li key={n.id} className="relative mb-4 last:mb-0">
@@ -146,20 +145,20 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
                   <span className="ml-auto shrink-0 text-xs text-ink-muted">{n.author_name}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  {n.refine_status === "done" ? <Chip tone="primary">검색 가능</Chip> : n.refine_status === "failed" ? <Chip tone="fail">정제 실패</Chip> : <Chip tone="warn">{n.refine_status === "processing" ? "정제 중" : "대기"}</Chip>}
+                  {n.refine_status === "done" ? <Chip tone="primary">검색 가능</Chip> : n.refine_status === "failed" ? <Chip tone="fail">정리 실패</Chip> : <Chip tone="warn">{n.refine_status === "processing" ? "정리 중" : "대기"}</Chip>}
                   {n.status === "deprecated" && <Chip tone="warn">폐기</Chip>}
                   {n.error_code && <Chip tone="fail">{n.error_code}</Chip>}
                   {n.keywords.slice(0, 3).map((k) => <Chip key={k}>#{k}</Chip>)}
                   <span className="ml-auto flex gap-1.5">
-                    <Button variant="outline" size="xs" onClick={() => refine(n.id)} disabled={busyId === n.id} title="원본은 그대로 두고 AI 정제만 다시 실행">
-                      <RefreshCw className="size-3" /> 재정제
+                    <Button variant="outline" size="xs" onClick={() => refine(n.id)} disabled={busyId === n.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다">
+                      <RefreshCw className="size-3" /> 다시 정리
                     </Button>
                     {n.status === "deprecated" ? (
-                      <Button variant="outline" size="xs" onClick={() => restore(n.id)} disabled={busyId === n.id} title="검색에 다시 포함">
+                      <Button variant="outline" size="xs" onClick={() => restore(n.id)} disabled={busyId === n.id} title="검색에 다시 넣습니다">
                         <RotateCcw className="size-3" /> 복원
                       </Button>
                     ) : (
-                      <Button variant="outline" size="xs" onClick={() => deprecate(n.id)} disabled={busyId === n.id} title="검색에서 제외 (원본 보존, 복원 가능)" className="text-warn hover:bg-warn-bg hover:text-warn">
+                      <Button variant="outline" size="xs" onClick={() => deprecate(n.id)} disabled={busyId === n.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn">
                         <Archive className="size-3" /> 폐기
                       </Button>
                     )}

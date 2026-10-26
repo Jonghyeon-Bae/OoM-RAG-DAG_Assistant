@@ -30,6 +30,7 @@ export interface LogNode {
   resolution_summary: string | null;
   refine_status: RefineStatus;
   last_confirmed_at: string | null;
+  deprecated_via: number | null; // 상위 폐기에 따라 함께 폐기된 경우 그 상위 id (복원 연동용)
   resolved_at: string | null; // 루트(장애 건) 완료 시각. 루트에만 의미 (TODO:04 쟁점 10)
   root_id: number; // 소속 장애 건의 루트 노드 id (서버 계산)
   created_at: string;
@@ -93,3 +94,59 @@ export type ChatEvent =
   | { event: "citations"; data: CitationsEvent }
   | { event: "done"; data: DoneEvent }
   | { event: "error"; data: { message: string; node?: StageNode } };
+
+export interface DashboardSummary {
+  is_sample: boolean; // true면 "예시 데이터" 라벨
+  search_time: {
+    before_min: number;
+    after_min: number;
+    by_intent: { intent: Intent; before_min: number; after_min: number }[];
+  };
+  eval: { faithfulness: number | null; answer_relevance: number | null; dataset_version: string | null; run_at: string | null };
+  logs: { total: number; week: number; open_roots: number; resolved_roots: number; refine_failed: number };
+  feedback: { up: number; down: number };
+  latency_ms: { retrieval: number | null; first_token: number | null; total: number | null };
+}
+
+export type DocStatus = "active" | "retired";
+export type SourceType = "pdf" | "hwp" | "markdown" | "json";
+
+export interface PolicyDocument {
+  id: number;
+  workspace_id: number;
+  slug: string;
+  title: string;
+  version: string;
+  source_type: SourceType; // TODO:04 (BE-REQ-001 S7)
+  has_file: boolean;
+  status: DocStatus;
+  retired_at: string | null;
+  retire_reason: string | null;
+  visibility: "company" | "dept"; // TODO:04 (S5)
+  chunk_count: number;
+  indexed_at: string;
+  uploaded_by: string; // 적재 실행자(스크립트 실행 계정 또는 1.1 업로드 UI 사용자)
+  uploaded_at: string;
+  approved_by: string | null; // 1.1 검수 승인자. 1.0은 NULL
+  retired_by: string | null;
+}
+
+export type DocEventAction = "uploaded" | "indexed" | "superseded" | "retired" | "restored" | "deleted";
+export interface DocEvent {
+  id: number;
+  workspace_id: number;
+  document_id: number;
+  document_label: string; // "제목 vX" — 삭제된 문서의 이력도 읽히도록 비정규화
+  action: DocEventAction;
+  actor: string;
+  source: "script" | "ui";
+  reason: string | null;
+  at: string;
+}
+
+export interface PolicyChunk {
+  id: string; // "{slug}-a{조항}-{seq}"
+  article_label: string;
+  page: number | null;
+  text: string;
+}

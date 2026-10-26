@@ -1,0 +1,178 @@
+[
+  {
+    "id": 1,
+    "document_id": 1,
+    "document_label": "VPN·원격접속 운영지침 v2.1",
+    "action": "uploaded",
+    "actor": "장문경",
+    "source": "script",
+    "reason": null,
+    "at": "2026-10-20T02:08:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 2,
+    "document_id": 1,
+    "document_label": "VPN·원격접속 운영지침 v2.1",
+    "action": "indexed",
+    "actor": "장문경",
+    "source": "script",
+    "reason": "청크 38개",
+    "at": "2026-10-20T02:10:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 3,
+    "document_id": 2,
+    "document_label": "VPN·원격접속 운영지침 v2.0",
+    "action": "uploaded",
+    "actor": "장문경",
+    "source": "script",
+    "reason": null,
+    "at": "2026-09-02T00:58:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 4,
+    "document_id": 2,
+    "document_label": "VPN·원격접속 운영지침 v2.0",
+    "action": "indexed",
+    "actor": "장문경",
+    "source": "script",
+    "reason": "청크 35개",
+    "at": "2026-09-02T01:00:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 5,
+    "document_id": 3,
+    "document_label": "정보보안 FAQ 2026-10",
+    "action": "uploaded",
+    "actor": "배종현",
+    "source": "script",
+    "reason": null,
+    "at": "2026-10-19T06:28:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 6,
+    "document_id": 3,
+    "document_label": "정보보안 FAQ 2026-10",
+    "action": "indexed",
+    "actor": "배종현",
+    "source": "script",
+    "reason": "청크 24개",
+    "at": "2026-10-19T06:30:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 7,
+    "document_id": 4,
+    "document_label": "소비자분쟁해결기준 (공정위 고시) 2025-12-30",
+    "action": "uploaded",
+    "actor": "신동준",
+    "source": "script",
+    "reason": null,
+    "at": "2026-10-21T03:55:00Z",
+    "workspace_id": 3
+  },
+  {
+    "id": 8,
+    "document_id": 4,
+    "document_label": "소비자분쟁해결기준 (공정위 고시) 2025-12-30",
+    "action": "indexed",
+    "actor": "신동준",
+    "source": "script",
+    "reason": "청크 112개",
+    "at": "2026-10-21T04:00:00Z",
+    "workspace_id": 3
+  },
+  {
+    "id": 9,
+    "document_id": 5,
+    "document_label": "환불규정 v3",
+    "action": "uploaded",
+    "actor": "홍경표",
+    "source": "script",
+    "reason": null,
+    "at": "2026-10-21T04:03:00Z",
+    "workspace_id": 3
+  },
+  {
+    "id": 10,
+    "document_id": 5,
+    "document_label": "환불규정 v3",
+    "action": "indexed",
+    "actor": "홍경표",
+    "source": "script",
+    "reason": "청크 17개",
+    "at": "2026-10-21T04:05:00Z",
+    "workspace_id": 3
+  },
+  {
+    "id": 11,
+    "document_id": 6,
+    "document_label": "환불규정 v2",
+    "action": "uploaded",
+    "actor": "홍경표",
+    "source": "script",
+    "reason": null,
+    "at": "2026-08-10T00:58:00Z",
+    "workspace_id": 3
+  },
+  {
+    "id": 12,
+    "document_id": 6,
+    "document_label": "환불규정 v2",
+    "action": "indexed",
+    "actor": "홍경표",
+    "source": "script",
+    "reason": "청크 16개",
+    "at": "2026-08-10T01:00:00Z",
+    "workspace_id": 3
+  },
+  {
+    "id": 13,
+    "document_id": 2,
+    "document_label": "VPN·원격접속 운영지침 v2.0",
+    "action": "superseded",
+    "actor": "스크립트(개정 자동 폐기)",
+    "source": "script",
+    "reason": "v2.1 개정 — 같은 제목 신버전 활성화",
+    "at": "2026-10-20T02:12:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 14,
+    "document_id": 6,
+    "document_label": "환불규정 v2",
+    "action": "superseded",
+    "actor": "스크립트(개정 자동 폐기)",
+    "source": "script",
+    "reason": "v3 개정 — 같은 제목 신버전 활성화",
+    "at": "2026-10-21T04:06:00Z",
+    "workspace_id": 3
+  },
+  {
+    "id": 15,
+    "document_id": 99,
+    "document_label": "정보보안 FAQ 2026-09",
+    "action": "retired",
+    "actor": "배종현",
+    "source": "ui",
+    "reason": "2026-10 판으로 대체",
+    "at": "2026-10-19T06:31:00Z",
+    "workspace_id": 2
+  },
+  {
+    "id": 16,
+    "document_id": 99,
+    "document_label": "정보보안 FAQ 2026-09",
+    "action": "deleted",
+    "actor": "배종현",
+    "source": "ui",
+    "reason": null,
+    "at": "2026-10-22T01:10:00Z",
+    "workspace_id": 2
+  }
+]
