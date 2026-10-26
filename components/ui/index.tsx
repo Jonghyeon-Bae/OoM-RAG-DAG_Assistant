@@ -26,10 +26,12 @@ export function Chip({
   tone = "neutral",
   className,
   children,
+  title,
 }: {
   tone?: "neutral" | "primary" | "warn" | "fail" | "dark";
   className?: string;
   children: React.ReactNode;
+  title?: string;
 }) {
   const t = {
     neutral: "bg-ref-bg text-ref",
@@ -38,7 +40,7 @@ export function Chip({
     fail: "bg-fail-bg text-fail",
     dark: "bg-primary-700 text-white",
   }[tone];
-  return <Badge className={cn("h-7 rounded-full px-3 font-medium", t, className)}>{children}</Badge>;
+  return <Badge title={title} className={cn("h-7 rounded-full px-3 font-medium", t, className)}>{children}</Badge>;
 }
 
 export function Field({ label, hint, children, htmlFor }: { label: string; hint?: string; children: React.ReactNode; htmlFor?: string }) {

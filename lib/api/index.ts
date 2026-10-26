@@ -1,6 +1,7 @@
 // 데이터 접근 단일 지점(서버). 지금은 메모리 목업, 3단계에서 Spring/Python 호출로 교체한다.
 // 클라이언트 컴포넌트는 lib/api/client.ts 를 통해 app/api/mock/* 라우트를 호출한다.
-import type { Workspace, User, LogNode, LogCounts, Chain, ChainNode, LogType } from "@/lib/types/domain";
+import type { Workspace, User, LogNode, LogCounts, Chain, ChainNode, LogType, DashboardSummary, PolicyDocument, PolicyChunk, DocStatus, DocEvent, DocEventAction } from "@/lib/types/domain";
+import chunksSeed from "@/mocks/chunks.json";
 import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
 import { connection } from "next/server";
@@ -205,4 +206,79 @@ export async function createLog(
     if (r) r.resolved_at = new Date().toISOString();
   }
   return withRoot(node);
+}
+
+// 대시보드 요약 — 로그 집계는 저장소 실시간, 탐색 시간·평가는 실측 전 예시값(is_sample)
+export async function getDashboardSummary(wsId: number): Promise<DashboardSummary> {
+  await connection();
+  const all = store.nodes.filter((l) => l.workspace_id === wsId).map(settle).map(withRoot);
+  const roots = all.filter((l) => l.id === l.root_id);
+  const since = Date.now() - 7 * 86400_000;
+  return {
+    is_sample: true,
+    search_time: {
+      before_min: 5.5,
+      after_min: 1.4,
+      by_intent: [
+        { intent: "policy", before_min: 3.8, after_min: 0.9 },
+        { intent: "troubleshoot", before_min: 5.6, after_min: 1.5 },
+        { intent: "both", before_min: 7.2, after_min: 1.8 },
+      ],
+    },
+    eval: { faithfulness: 0.94, answer_relevance: 0.91, dataset_version: "sample", run_at: null },
+    logs: {
+      total: all.length,
+      week: all.filter((l) => Date.parse(l.created_at) >= since).length,
+      open_roots: roots.filter((r) => !r.resolved_at && r.status === "active").length,
+      resolved_roots: roots.filter((r) => !!r.resolved_at).length,
+      refine_failed: all.filter((l) => l.refine_status === "failed").length,
+    },
+    feedback: { up: 0, down: 0 },
+    latency_ms: { retrieval: null, first_token: null, total: null },
+  };
+}
+
+// ---- 규정 문서 (Spring 소유: status·삭제. 인덱싱은 Python 스크립트)
+export async function getDocuments(wsId: number): Promise<PolicyDocument[]> {
+  return store.docs.filter((d) => d.workspace_id === wsId).sort((a, b) => a.title.localeCompare(b.title) || b.indexed_at.localeCompare(a.indexed_at));
+}
+
+function logDocEvent(d: PolicyDocument, action: DocEventAction, actor: string, reason: string | null) {
+  store.docEvents.push({ id: store.docEvents.length + 1, workspace_id: d.workspace_id, document_id: d.id, document_label: `${d.title} ${d.version}`, action, actor, source: "ui", reason, at: new Date().toISOString() });
+}
+
+export async function setDocumentStatus(wsId: number, id: number, status: DocStatus, actor: string, reason?: string): Promise<PolicyDocument | null> {
+  const d = store.docs.find((x) => x.id === id && x.workspace_id === wsId);
+  if (!d) return null;
+  d.status = status;
+  d.retired_at = status === "retired" ? new Date().toISOString() : null;
+  d.retire_reason = status === "retired" ? (reason ?? null) : null;
+  d.retired_by = status === "retired" ? actor : null;
+  logDocEvent(d, status === "retired" ? "retired" : "restored", actor, reason ?? null);
+  return d;
+}
+
+// 삭제는 retired 상태에서만. 청크·파일은 서버가 함께 제거(CASCADE). 실행자는 purge_document() (ARCH-003 #2)
+export async function deleteDocument(wsId: number, id: number, actor: string): Promise<"ok" | "not_found" | "not_retired"> {
+  const i = store.docs.findIndex((x) => x.id === id && x.workspace_id === wsId);
+  if (i < 0) return "not_found";
+  if (store.docs[i].status !== "retired") return "not_retired";
+  logDocEvent(store.docs[i], "deleted", actor, null);
+  store.docs.splice(i, 1);
+  return "ok";
+}
+
+export async function getDocumentChunks(wsId: number, id: number): Promise<PolicyChunk[] | null> {
+  const d = store.docs.find((x) => x.id === id && x.workspace_id === wsId);
+  if (!d) return null;
+  const all = chunksSeed as Record<string, PolicyChunk[]>;
+  return all[d.slug] ?? [];
+}
+
+// 이력. document_id 없으면 워크스페이스 전체(삭제된 문서 포함). 실서버: audit_log(S8) 읽기
+export async function getDocumentEvents(wsId: number, documentId?: number, limit = 30): Promise<DocEvent[]> {
+  return store.docEvents
+    .filter((e) => e.workspace_id === wsId && (!documentId || e.document_id === documentId))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, limit);
 }
