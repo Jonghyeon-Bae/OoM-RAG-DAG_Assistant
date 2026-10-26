@@ -74,7 +74,10 @@ export async function getChain(wsId: number, entryId: number, maxDepth = 3): Pro
   const ids = new Set(depth.keys());
   const edges = store.edges.filter((e) => ids.has(e.parent_id) && ids.has(e.child_id));
   const root = nodes.find((n) => n.depth === Math.min(...nodes.map((x) => x.depth)));
-  return { entry_id: entryId, nodes, edges, summary: root ? `${root.title} 체인: 노드 ${nodes.length}개, 해결 ${nodes.filter((n) => n.type === "success" && n.status === "active").length}건. (AI 요약은 3단계에서 LLM 호출로 대체)` : null };
+  // 요약은 보고 있는 가지가 아니라 장애 건 전체 기준 (UX-003 B5)
+  const top = store.nodes.find((x) => x.id === rootOf(entryId));
+  const whole = top ? subtree(top.id).map((i) => store.nodes.find((x) => x.id === i)!).filter(Boolean) : [];
+  return { entry_id: entryId, nodes, edges, summary: root && top ? `${top.title} 장애 건: 기록 ${whole.length}건, 해결 ${whole.filter((n) => n.type === "success" && n.status === "active").length}건${top.resolved_at ? ", 완료" : ", 진행 중"}. (AI 요약은 3단계에서 LLM 호출로 대체)` : null };
 }
 
 // 목업 정제 워커: 읽는 시점에 경과 시간으로 상태 전이 (pending 1.5s → processing 3.5s → done)
@@ -104,11 +107,25 @@ function withRoot(n: LogNode): LogNode {
   return { ...n, root_id: rootOf(n.id) };
 }
 
-export async function setResolved(wsId: number, id: number, resolved: boolean): Promise<LogNode | null> {
+// 루트의 전체 자손 id (깊이 제한 없음)
+function subtree(rootId: number): number[] {
+  const out: number[] = []; const q = [rootId]; const seen = new Set<number>();
+  while (q.length) { const c = q.shift()!; if (seen.has(c)) continue; seen.add(c); out.push(c); store.edges.filter((e) => e.parent_id === c).forEach((e) => q.push(e.child_id)); }
+  return out;
+}
+export function hasActiveSuccess(rootId: number): boolean {
+  return subtree(rootId).some((id) => { const n = store.nodes.find((x) => x.id === id); return n?.type === "success" && n.status === "active" && id !== rootId; });
+}
+
+// 완료 처리: 루트만. 이어진 활성 성공 로그가 없으면 사유(note) 필수 (UX-003 D1). 참고 루트(자료)는 완료 대상 아님
+export async function setResolved(wsId: number, id: number, resolved: boolean, note?: string): Promise<LogNode | "NOT_ROOT" | "NOTE_REQUIRED" | "REF_ROOT" | null> {
   const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
   if (!n) return null;
-  if (rootOf(n.id) !== n.id) return null; // 루트만 완료 처리 가능
+  if (rootOf(n.id) !== n.id) return "NOT_ROOT";
+  if (n.type === "ref") return "REF_ROOT";
+  if (resolved && !hasActiveSuccess(n.id) && !note?.trim()) return "NOTE_REQUIRED";
   n.resolved_at = resolved ? new Date().toISOString() : null;
+  n.resolve_note = resolved ? (note?.trim() || null) : null;
   return withRoot(n);
 }
 
@@ -129,24 +146,26 @@ export async function refineLog(wsId: number, id: number): Promise<LogNode | nul
 }
 
 // 폐기/복원. cascade=true면 "이 노드를 거치지 않고는 활성 조상에 닿을 수 없는" 자손도 함께 폐기한다 (다중 부모로 다른 활성 경로가 있으면 제외).
-export async function setLogStatus(wsId: number, id: number, status: "active" | "deprecated", cascade = false): Promise<{ node: LogNode; affected: number[] } | null> {
+export async function setLogStatus(wsId: number, id: number, status: "active" | "deprecated", cascade = false, reason?: string): Promise<{ node: LogNode; affected: number[] } | null> {
   const n = store.nodes.find((x) => x.id === id && x.workspace_id === wsId);
   if (!n) return null;
   const affected: number[] = [];
   if (status === "deprecated") {
     n.status = "deprecated";
     n.deprecated_via = null;
+    n.deprecate_reason = reason ?? null;
     if (cascade) {
       for (const d of orphanedBy(id)) {
         const c = store.nodes.find((x) => x.id === d)!;
-        if (c.status === "active") { c.status = "deprecated"; c.deprecated_via = id; affected.push(d); }
+        if (c.status === "active") { c.status = "deprecated"; c.deprecated_via = id; c.deprecate_reason = reason ?? null; affected.push(d); }
       }
     }
   } else {
     n.status = "active";
     n.deprecated_via = null;
+    n.deprecate_reason = null;
     // 이 노드 폐기로 함께 폐기됐던 자손만 복원
-    store.nodes.filter((x) => x.deprecated_via === id).forEach((c) => { c.status = "active"; c.deprecated_via = null; affected.push(c.id); });
+    store.nodes.filter((x) => x.deprecated_via === id).forEach((c) => { c.status = "active"; c.deprecated_via = null; c.deprecate_reason = null; affected.push(c.id); });
   }
   return { node: withRoot(n), affected };
 }
@@ -173,12 +192,19 @@ export function orphanedBy(id: number): number[] {
 
 export async function createLog(
   wsId: number,
-  input: { type: LogType; title: string; body: string; parent_id: number | null; author_name?: string; resolve_root?: boolean },
+  input: { type: LogType; title: string; body: string; parent_id: number | null; author_name?: string; resolve_root?: boolean; problem_title?: string },
 ): Promise<LogNode> {
-  const id = store.nextId++;
-  const parent = input.parent_id ? store.nodes.find((n) => n.id === input.parent_id && n.workspace_id === wsId) : undefined;
+  let parent = input.parent_id ? store.nodes.find((n) => n.id === input.parent_id && n.workspace_id === wsId) : undefined;
   if (input.parent_id && !parent) throw new Error("PARENT_NOT_FOUND");
   if (parent?.status === "deprecated") throw new Error("PARENT_DEPRECATED");
+  // 루트는 실패 또는 참고만. 성공으로 새 장애 건을 시작하면 "어떤 문제였나"로 실패 루트를 먼저 만들고 그 아래에 성공을 단다 (UX-003 D2)
+  if (!parent && input.type === "success") {
+    if (!input.problem_title?.trim()) throw new Error("PROBLEM_TITLE_REQUIRED");
+    parent = (await createLog(wsId, { type: "fail", title: input.problem_title.trim(), body: `(해결 기록과 함께 등록됨) ${input.body}`, parent_id: null, author_name: input.author_name })) as StoreNode;
+    parent = store.nodes.find((n) => n.id === parent!.id)!;
+    input = { ...input, resolve_root: true };
+  }
+  const id = store.nextId++;
   const node: StoreNode = {
     id,
     refine_started_at: Date.now(),
@@ -196,6 +222,8 @@ export async function createLog(
     last_confirmed_at: null,
     deprecated_via: null,
     resolved_at: null,
+    resolve_note: null,
+    deprecate_reason: null,
     root_id: id,
     created_at: new Date().toISOString(),
   };
@@ -281,4 +309,10 @@ export async function getDocumentEvents(wsId: number, documentId?: number, limit
     .filter((e) => e.workspace_id === wsId && (!documentId || e.document_id === documentId))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, limit);
+}
+
+// 요청마다 다른 값. 같은 URL 재진입 시 클라이언트 컴포넌트를 새로 마운트하는 key 용 (UX-003 B2)
+export async function requestNonce(): Promise<number> {
+  await connection();
+  return Date.now();
 }

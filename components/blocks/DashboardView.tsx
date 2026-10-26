@@ -51,7 +51,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
     <main className="flex flex-col gap-6 p-8">
       {/* B-50 KPI */}
       <div className="grid grid-cols-4 gap-4">
-        <Kpi label="평균 정보 탐색 시간" value={<>{st.before_min}<span className="mx-1 text-ink-muted">→</span>{st.after_min}분</>} sub={`-${reduce}% 단축`} subTone="fail" sample={data.is_sample} />
+        <Kpi label="평균 정보 탐색 시간" value={<>{st.before_min}<span className="mx-1 text-ink-muted">→</span>{st.after_min}분</>} sub={`-${reduce}% 단축`} subTone="primary" sample={data.is_sample} />
         <Kpi label="Faithfulness" value={fmt(ev.faithfulness)} sub="답변이 근거에 충실한 정도" sample={data.is_sample} />
         <Kpi label="Answer Relevance" value={fmt(ev.answer_relevance)} sub="질문에 맞는 답인지" sample={data.is_sample} />
         <Kpi label="등록된 업무 로그" value={`${logs.total}건`} sub={`이번 주 +${logs.week}`} subTone="primary" />
@@ -79,7 +79,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
               <div className="text-xs text-warn">진행 중</div>
               <div className="text-2xl font-bold text-ink">{logs.open_roots}건</div>
             </Link>
-            <Link href={`/w/${wsId}/timeline`} className="rounded-xl bg-success-bg/60 p-4 hover:bg-success-bg">
+            <Link href={`/w/${wsId}/timeline?resolved=1`} className="rounded-xl bg-success-bg/60 p-4 hover:bg-success-bg">
               <div className="text-xs text-success">완료</div>
               <div className="text-2xl font-bold text-ink">{logs.resolved_roots}건</div>
             </Link>

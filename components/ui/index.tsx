@@ -55,9 +55,9 @@ export function Field({ label, hint, children, htmlFor }: { label: string; hint?
   );
 }
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
+export function Avatar({ name, className, title }: { name: string; className?: string; title?: string }) {
   return (
-    <span className={cn("flex size-10 items-center justify-center rounded-full bg-primary-700 font-bold text-white", className)}>
+    <span title={title ?? name} className={cn("flex size-10 items-center justify-center rounded-full bg-primary-700 font-bold text-white", className)}>
       {name[0]}
     </span>
   );

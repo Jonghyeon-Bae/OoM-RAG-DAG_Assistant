@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { Chip, Avatar } from "@/components/ui";
+import { getCurrentUser } from "@/lib/api/session";
 import type { Workspace } from "@/lib/types/domain";
 
 export function Header({
@@ -6,13 +8,11 @@ export function Header({
   subtitle,
   ws,
   right,
-  userName = "배종현",
 }: {
   title: string;
   subtitle: string;
   ws: Workspace;
   right?: React.ReactNode;
-  userName?: string;
 }) {
   return (
     <header className="flex h-20 items-center justify-between border-b-2 border-primary-200 bg-card px-8">
@@ -24,8 +24,14 @@ export function Header({
         <Chip tone="primary">{ws.name}</Chip>
         <Chip tone={ws.policy_enabled ? "primary" : "neutral"}>{ws.policy_enabled ? "규정 + 해결 사례" : "해결 사례만"}</Chip>
         {right}
-        <Avatar name={userName} />
+        <Suspense fallback={<Avatar name="·" />}><UserAvatar /></Suspense>
       </div>
     </header>
   );
+}
+
+// 쿠키(데모 세션) 기반 — 동적이므로 Suspense 안에서만 렌더
+async function UserAvatar() {
+  const u = await getCurrentUser();
+  return <Avatar name={u.name} title={`${u.name} ${u.title}`} />;
 }

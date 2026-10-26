@@ -25,13 +25,13 @@ function fmt(iso: string) {
   return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-type Group = { root: LogNode; nodes: LogNode[]; last: string; resolved: boolean };
+type Group = { root: LogNode; nodes: LogNode[]; total: number; hasSuccess: boolean; last: string; resolved: boolean };
 
-export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialChain }: { wsId: number; logs: LogNode[]; initialEntry: number; initialChain: Chain | null }) {
+export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialChain, initialShowResolved = false }: { wsId: number; logs: LogNode[]; initialEntry: number; initialChain: Chain | null; initialShowResolved?: boolean }) {
   const [logs, setLogs] = useState(initialLogs);
   const [type, setType] = useState<LogType | "all">("all");
   const [q, setQ] = useState("");
-  const [showResolved, setShowResolved] = useState(false);
+  const [showResolved, setShowResolved] = useState(initialShowResolved);
   const [entryId, setEntryId] = useState(initialEntry);
   const [chain, setChain] = useState<Chain | null>(initialChain);
   const [open, setOpen] = useState<Set<number>>(() => new Set([initialLogs.find((l) => l.id === initialEntry)?.root_id ?? 0]));
@@ -51,7 +51,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
         const visible = nodes
           .filter((n) => (type === "all" || n.type === type) && hit(n))
           .sort((a, b) => a.path_label.localeCompare(b.path_label) || a.created_at.localeCompare(b.created_at)); // 트리 순서(원인 → 해결), 같은 깊이는 시간순
-        return { root, nodes: visible, last: nodes.reduce((m, n) => (n.created_at > m ? n.created_at : m), ""), resolved: !!root.resolved_at };
+        return { root, nodes: visible, total: nodes.length, hasSuccess: nodes.some((n) => n.id !== root.id && n.type === "success" && n.status === "active"), last: nodes.reduce((m, n) => (n.created_at > m ? n.created_at : m), ""), resolved: !!root.resolved_at };
       })
       .filter((g) => g.nodes.length > 0 && (showResolved || !g.resolved || g.root.root_id === logs.find((l) => l.id === entryId)?.root_id))
       .sort((a, b) => b.last.localeCompare(a.last));
@@ -96,11 +96,13 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
     setBusyId(null);
   };
   // 폐기: 하위가 고아가 되는 노드면 인라인으로 범위를 묻는다 (이 노드만 / 하위 N건 포함). 복원은 함께 폐기됐던 하위도 되살린다.
-  const [ask, setAsk] = useState<{ id: number; orphaned: number[] } | null>(null);
-  const applyStatus = async (id: number, status: "active" | "deprecated", cascade = false) => {
+  const [ask, setAsk] = useState<{ id: number; orphaned: number[]; reason: string } | null>(null);
+  const [note, setNote] = useState<{ id: number; text: string } | null>(null); // 성공 로그 없이 완료할 때 사유 입력
+  const [flash, setFlash] = useState<string | null>(null);
+  const applyStatus = async (id: number, status: "active" | "deprecated", cascade = false, reason?: string) => {
     setBusyId(id);
     setAsk(null);
-    const r = await patchStatus(wsId, id, status, status === "deprecated" ? "사용자 폐기" : undefined, cascade);
+    const r = await patchStatus(wsId, id, status, reason, cascade);
     if (r) {
       const { affected, ...n } = r;
       patchInto(n);
@@ -108,35 +110,82 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
         const fresh = await Promise.all(affected.map((a) => fetchLog(wsId, a)));
         fresh.forEach((f) => f && patchInto(f));
       }
+      setFlash(status === "deprecated" ? `${1 + affected.length}건 폐기됨 — 검색에서 제외됩니다. 각 로그의 "복원"으로 되돌릴 수 있습니다` : `${1 + affected.length}건 복원됨`);
     }
     setBusyId(null);
   };
+  // 폐기는 항상 사유를 받는다(UX-003 D3). 하위가 고아가 되면 범위도 함께 고른다
   const setStatus = async (id: number, status: "active" | "deprecated") => {
     if (status === "active") return applyStatus(id, "active");
     const orphaned = await fetchOrphaned(wsId, id);
-    if (orphaned.length === 0) return applyStatus(id, "deprecated");
-    setAsk({ id, orphaned });
+    setAsk({ id, orphaned, reason: "" });
   };
-  const AskBox = ({ id }: { id: number }) =>
-    ask?.id === id ? (
-      <div className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-warn-bg bg-warn-bg/50 px-3 py-2 text-xs text-ink">
-        <span>이 로그를 폐기하면 여기에 이어진 로그 <b>{ask.orphaned.length}건</b>이 앞 기록을 잃습니다.</span>
-        <Button size="xs" variant="outline" onClick={() => applyStatus(id, "deprecated", true)} className="text-warn hover:bg-warn-bg hover:text-warn">이어진 {ask.orphaned.length}건도 함께 폐기</Button>
-        <Button size="xs" variant="outline" onClick={() => applyStatus(id, "deprecated", false)}>이 로그만 폐기</Button>
-        <Button size="xs" variant="ghost" onClick={() => setAsk(null)}>취소</Button>
+  const titleOf = (id: number) => logs.find((l) => l.id === id)?.title ?? `#${id}`;
+  const AskBox = ({ id }: { id: number }) => {
+    if (ask?.id !== id) return null;
+    const ok = ask.reason.trim().length > 0;
+    return (
+      <div className="mt-1 flex flex-col gap-2 rounded-lg border border-warn-bg bg-warn-bg/50 px-3 py-2 text-xs text-ink">
+        <label className="flex flex-wrap items-center gap-2">
+          <span>폐기 사유</span>
+          <input autoFocus value={ask.reason} onChange={(e) => setAsk({ ...ask, reason: e.target.value })} placeholder="예: 잘못 짚은 원인 / 중복 기록" className="h-7 min-w-56 flex-1 rounded-md border border-border bg-white px-2 text-xs" />
+        </label>
+        {ask.orphaned.length > 0 && (
+          <div>
+            <span>이어진 로그 <b>{ask.orphaned.length}건</b>이 앞 기록을 잃습니다: </span>
+            <span className="text-ink-muted">{ask.orphaned.slice(0, 3).map(titleOf).join(" · ")}{ask.orphaned.length > 3 ? ` 외 ${ask.orphaned.length - 3}건` : ""}</span>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {ask.orphaned.length > 0 ? (
+            <>
+              <Button size="xs" variant="outline" disabled={!ok} onClick={() => applyStatus(id, "deprecated", true, ask.reason.trim())} className="text-warn hover:bg-warn-bg hover:text-warn">이어진 {ask.orphaned.length}건도 함께 폐기</Button>
+              <Button size="xs" variant="outline" disabled={!ok} onClick={() => applyStatus(id, "deprecated", false, ask.reason.trim())}>이 로그만 폐기</Button>
+            </>
+          ) : (
+            <Button size="xs" variant="outline" disabled={!ok} onClick={() => applyStatus(id, "deprecated", false, ask.reason.trim())} className="text-warn hover:bg-warn-bg hover:text-warn">폐기</Button>
+          )}
+          <Button size="xs" variant="ghost" onClick={() => setAsk(null)}>취소</Button>
+        </div>
       </div>
-    ) : null;
-
-  const resolve = async (root: LogNode, value: boolean) => {
-    const n = await patchResolved(wsId, root.id, value);
-    if (n) setLogs((ls) => ls.map((l) => (l.id === n.id ? { ...l, resolved_at: n.resolved_at } : l)));
+    );
   };
+
+  // 완료: 이어진 성공 로그가 있으면 바로, 없으면 사유를 받는다(UX-003 D1). 해제는 사유 없음
+  const resolve = async (root: LogNode, value: boolean, text?: string) => {
+    const r = await patchResolved(wsId, root.id, value, text);
+    if (r.ok) {
+      setNote(null);
+      setLogs((ls) => ls.map((l) => (l.id === r.node.id ? { ...l, resolved_at: r.node.resolved_at, resolve_note: r.node.resolve_note } : l)));
+    } else if (r.code === "NOTE_REQUIRED") {
+      setNote({ id: root.id, text: "" });
+    } else {
+      setFlash(r.message);
+    }
+  };
+  const NoteBox = ({ root }: { root: LogNode }) =>
+    note?.id === root.id ? (
+      <form className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-success-bg bg-success-bg/40 px-3 py-2 text-xs text-ink" onSubmit={(e) => { e.preventDefault(); if (note.text.trim()) resolve(root, true, note.text.trim()); }}>
+        <span>이어진 해결(성공) 로그가 없습니다. 어떻게 마무리됐나요?</span>
+        <input autoFocus value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} placeholder="예: 재현 안 됨 / 외부 조치로 해소" className="h-7 min-w-56 flex-1 rounded-md border border-border bg-white px-2 text-xs" />
+        <Button size="xs" type="submit" disabled={!note.text.trim()}>완료 처리</Button>
+        <Button size="xs" type="button" variant="ghost" onClick={() => setNote(null)}>취소</Button>
+      </form>
+    ) : null;
 
   useEffect(() => {
     cardRefs.current.get(entryId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [entryId]);
 
+  // 폐기·복원 안내는 6초 뒤 자동 닫힘
   useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(null), 6000);
+    return () => clearTimeout(t);
+  }, [flash]);
+
+  useEffect(() => {
+    if (!entryId) return; // 빈 워크스페이스: ?entry=0 을 URL에 남기지 않는다
     let alive = true;
     fetchChain(wsId, entryId).then((c) => alive && startTransition(() => setChain(c)));
     const url = new URL(window.location.href);
@@ -151,6 +200,12 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
 
   return (
     <main className="grid grid-cols-[460px_1fr] items-start gap-6 p-8">
+      {flash && (
+        <div role="status" className="fixed right-6 top-6 z-50 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-lg">
+          <span className="text-ink">{flash}</span>
+          <button type="button" onClick={() => setFlash(null)} className="rounded px-1 text-ink-muted hover:bg-primary-100" aria-label="닫기">×</button>
+        </div>
+      )}
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
@@ -191,8 +246,8 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
                       <TypeBadge type={g.root.type} />
                       {g.root.error_code && <Chip tone="fail" className="h-5 text-[11px]">{g.root.error_code}</Chip>}
-                      {g.resolved ? <Chip tone="primary" className="h-5 text-[11px]">완료</Chip> : <Chip tone="warn" className="h-5 text-[11px]">진행 중</Chip>}
-                      <span>기록 {g.nodes.length + 1}건</span>
+                      {g.root.type === "ref" ? <Chip tone="neutral" className="h-5 text-[11px]" title="절차·자료 기록. 완료 처리 대상이 아닙니다">자료</Chip> : g.resolved ? <Chip tone="primary" className="h-5 text-[11px]" title={g.root.resolve_note ? `완료 사유: ${g.root.resolve_note}` : "이어진 해결 로그로 완료"}>완료{g.root.resolve_note && " · 사유 있음"}</Chip> : <Chip tone="warn" className="h-5 text-[11px]">진행 중</Chip>}
+                      <span>기록 {g.total}건</span>
                       <span>·</span>
                       <span>최근 {fmt(g.last)}</span>
                       <span>·</span>
@@ -206,10 +261,10 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                     )}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    {g.resolved ? (
+                    {g.root.type === "ref" ? null : g.resolved ? (
                       <Button variant="outline" size="xs" onClick={() => resolve(g.root, false)} title="완료 해제"><Undo2 className="size-3" /> 완료 해제</Button>
                     ) : (
-                      <Button variant="outline" size="xs" onClick={() => resolve(g.root, true)} title="이 장애 건을 완료 처리" className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
+                      <Button variant="outline" size="xs" onClick={() => resolve(g.root, true)} title={g.hasSuccess ? "이 장애 건을 완료 처리" : "해결 로그가 없어 완료 사유를 묻습니다"} className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
                     )}
                     <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100"><Plus className="size-3" /> 로그 추가</Link>
                     {g.root.id === entryId && (
@@ -224,6 +279,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                     )}
                   </div>
                 </div>
+                {note?.id === g.root.id && <div className="px-4 pb-3"><NoteBox root={g.root} /></div>}
                 {g.root.id === entryId && ask?.id === g.root.id && <div className="px-4 pb-3"><AskBox id={g.root.id} /></div>}
                 {isOpen && (
                   <ol className="relative mx-4 mb-3 ml-7 border-l border-border pl-5">
@@ -250,7 +306,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                                     {l.error_code && <Chip tone="fail">{l.error_code}</Chip>}
                                     {l.keywords.map((k) => <Chip key={k}>#{k}</Chip>)}
                                     {l.refine_status === "done" ? <Chip tone="primary">검색 가능</Chip> : <Chip tone="warn">{l.refine_status === "failed" ? "정리 실패" : "정리 중"}</Chip>}
-                                    {l.status === "deprecated" && <Chip tone="warn">폐기</Chip>}
+                                    {l.status === "deprecated" && <Chip tone="warn" title={l.deprecate_reason ? `사유: ${l.deprecate_reason}` : undefined}>폐기{l.deprecate_reason && ` · ${l.deprecate_reason}`}</Chip>}
                                   </div>
                                   <div className="flex items-center text-xs text-ink-muted">{l.author_name}
                                     <Link href={`/w/${wsId}/logs/new?parent=${l.id}`} className="ml-auto inline-flex items-center gap-1 font-medium text-primary-700 hover:underline"><Plus className="size-3" /> 이 로그 아래에 추가</Link>

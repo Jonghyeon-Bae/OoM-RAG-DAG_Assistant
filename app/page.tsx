@@ -27,7 +27,7 @@ export default async function LoginPage() {
                   .map((u) => (
                     <li key={u.id}>
                       <Link
-                        href={`/w/${ws.id}/assistant?u=${u.id}`}
+                        href={`/api/mock/session?u=${u.id}&next=/w/${ws.id}/timeline`}
                         className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:border-primary-400 hover:bg-primary-100"
                       >
                         <span className="flex size-8 items-center justify-center rounded-full bg-primary-200 text-sm font-bold text-primary-700">{u.name[0]}</span>

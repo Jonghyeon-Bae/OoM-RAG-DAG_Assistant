@@ -93,8 +93,19 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
     setBusyId(null);
   };
   const refine = (id: number) => act(id, () => postRefine(wsId, id));
-  const deprecate = (id: number) => act(id, () => patchStatus(wsId, id, "deprecated", "사용자 폐기"));
+  // 폐기는 사유 필수(UX-003 D3). 등록 화면에서는 범위 선택 없이 이 로그만 폐기 — 이어진 로그가 있는 경우는 타임라인에서
+  const [ask, setAsk] = useState<{ id: number; reason: string } | null>(null);
+  const deprecate = (id: number, reason: string) => { setAsk(null); return act(id, () => patchStatus(wsId, id, "deprecated", reason)); };
   const restore = (id: number) => act(id, () => patchStatus(wsId, id, "active"));
+  const reasonBox = (id: number) =>
+    ask?.id === id ? (
+      <form className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-warn-bg bg-warn-bg/50 px-3 py-2 text-xs" onSubmit={(e) => { e.preventDefault(); if (ask.reason.trim()) deprecate(id, ask.reason.trim()); }}>
+        <span>폐기 사유</span>
+        <input autoFocus value={ask.reason} onChange={(e) => setAsk({ ...ask, reason: e.target.value })} placeholder="예: 잘못 적음 / 중복" className="h-7 min-w-48 flex-1 rounded-md border border-border bg-white px-2 text-xs" />
+        <Button size="xs" type="submit" disabled={!ask.reason.trim()} className="text-warn hover:bg-warn-bg hover:text-warn" variant="outline">폐기</Button>
+        <Button size="xs" type="button" variant="ghost" onClick={() => setAsk(null)}>취소</Button>
+      </form>
+    ) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -120,9 +131,10 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
                   <ExternalLink className="size-4" /> 타임라인에서 보기
                 </Link>
                 <Button variant="outline" size="lg" onClick={() => refine(current.id)} disabled={busyId === current.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다"><RefreshCw className="size-4" /> 다시 정리</Button>
-                <Button variant="outline" size="lg" onClick={() => deprecate(current.id)} disabled={busyId === current.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-4" /> 폐기</Button>
+                <Button variant="outline" size="lg" onClick={() => setAsk({ id: current.id, reason: "" })} disabled={busyId === current.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-4" /> 폐기</Button>
               </div>
             )}
+            {current.refine_status === "done" && reasonBox(current.id)}
           </>
         ) : (
           <div className="rounded-xl border border-dashed border-border py-8 text-center text-sm text-ink-muted">
@@ -158,12 +170,13 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
                         <RotateCcw className="size-3" /> 복원
                       </Button>
                     ) : (
-                      <Button variant="outline" size="xs" onClick={() => deprecate(n.id)} disabled={busyId === n.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn">
+                      <Button variant="outline" size="xs" onClick={() => setAsk({ id: n.id, reason: "" })} disabled={busyId === n.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn">
                         <Archive className="size-3" /> 폐기
                       </Button>
                     )}
                   </span>
                 </div>
+                {reasonBox(n.id)}
               </div>
             </li>
           ))}
