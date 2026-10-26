@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { LogForm } from "@/components/blocks/LogForm";
 import { RefinePanel } from "@/components/blocks/RefinePanel";
 import { fetchChain, fetchLogs } from "@/lib/api/client";
+import { LOG_CREATED_EVENT } from "@/components/shell/WeeklyChip";
 import type { Chain, LogNode } from "@/lib/types/domain";
 
 function Toast({ message, href, onClose }: { message: string | null; href?: string; onClose: () => void }) {
@@ -35,9 +36,9 @@ export function RegisterScreen({ wsId, candidates: initialCandidates, initialRec
   const [nextParent, setNextParent] = useState<string | undefined>(initialParent);
   const [nextPreview, setNextPreview] = useState<Chain | null>(initialPreview ?? null);
   return (
-    <main className="grid grid-cols-[440px_1fr] items-start gap-6 p-8">
+    <main className="grid items-start gap-6 p-4 md:p-6 xl:grid-cols-[440px_1fr] xl:p-8">
       <Toast message={toast?.message ?? null} href={toast?.href} onClose={() => setToast(null)} />
-      <Card className="p-6">
+      <Card className="min-w-0 p-6">
         <h2 className="mb-5 font-bold text-ink">마이크로 업무로그 간편 등록</h2>
         <LogForm
           key={formKey}
@@ -45,6 +46,7 @@ export function RegisterScreen({ wsId, candidates: initialCandidates, initialRec
           candidates={candidates}
           onCreated={async (n) => {
             setCurrentId(n.id);
+            window.dispatchEvent(new Event(LOG_CREATED_EVENT));
             setToast({ message: `"${n.title}" 등록됨 — AI가 정리를 시작합니다`, href: `/w/${wsId}/timeline?entry=${n.id}` });
             const [fresh, chain] = await Promise.all([fetchLogs(wsId), fetchChain(wsId, n.root_id)]);
             setCandidates(fresh);

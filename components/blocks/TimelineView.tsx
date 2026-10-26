@@ -25,13 +25,14 @@ function fmt(iso: string) {
   return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-type Group = { root: LogNode; nodes: LogNode[]; total: number; hasSuccess: boolean; last: string; resolved: boolean };
+type Group = { root: LogNode; nodes: LogNode[]; dim: Set<number>; total: number; hasSuccess: boolean; last: string; resolved: boolean };
 
 export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialChain, initialShowResolved = false }: { wsId: number; logs: LogNode[]; initialEntry: number; initialChain: Chain | null; initialShowResolved?: boolean }) {
   const [logs, setLogs] = useState(initialLogs);
   const [type, setType] = useState<LogType | "all">("all");
   const [q, setQ] = useState("");
   const [showResolved, setShowResolved] = useState(initialShowResolved);
+  const [hideDeprecated, setHideDeprecated] = useState(true); // 폐기 로그는 기본 숨김 (UX-003 C6)
   const [entryId, setEntryId] = useState(initialEntry);
   const [chain, setChain] = useState<Chain | null>(initialChain);
   const [open, setOpen] = useState<Set<number>>(() => new Set([initialLogs.find((l) => l.id === initialEntry)?.root_id ?? 0]));
@@ -48,17 +49,24 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
     return [...byRoot.entries()]
       .map(([rid, nodes]) => {
         const root = nodes.find((n) => n.id === rid) ?? nodes[0];
-        const visible = nodes
-          .filter((n) => (type === "all" || n.type === type) && hit(n))
+        const pool = nodes.filter((n) => !hideDeprecated || n.status === "active" || n.id === rid);
+        const hits = pool.filter((n) => (type === "all" || n.type === type) && hit(n));
+        // 필터·검색 중에는 맞은 로그의 상위(원인)도 흐리게 남겨 맥락을 유지한다 (UX-003 C7)
+        const filtering = type !== "all" || !!ql;
+        const keep = new Set(hits.map((n) => n.id));
+        const dim = new Set<number>();
+        if (filtering) hits.forEach((h) => pool.forEach((n) => { if (!keep.has(n.id) && n.id !== rid && h.path_label.startsWith(n.path_label + ".")) { keep.add(n.id); dim.add(n.id); } }));
+        const visible = pool
+          .filter((n) => keep.has(n.id))
           .sort((a, b) => a.path_label.localeCompare(b.path_label) || a.created_at.localeCompare(b.created_at)); // 트리 순서(원인 → 해결), 같은 깊이는 시간순
-        return { root, nodes: visible, total: nodes.length, hasSuccess: nodes.some((n) => n.id !== root.id && n.type === "success" && n.status === "active"), last: nodes.reduce((m, n) => (n.created_at > m ? n.created_at : m), ""), resolved: !!root.resolved_at };
+        return { root, nodes: visible, dim, total: nodes.filter((n) => n.status === "active").length, hasSuccess: nodes.some((n) => n.id !== root.id && n.type === "success" && n.status === "active"), last: nodes.reduce((m, n) => (n.created_at > m ? n.created_at : m), ""), resolved: !!root.resolved_at };
       })
       .filter((g) => g.nodes.length > 0 && (showResolved || !g.resolved || g.root.root_id === logs.find((l) => l.id === entryId)?.root_id))
       .sort((a, b) => b.last.localeCompare(a.last));
-  }, [logs, type, q, showResolved, entryId]);
+  }, [logs, type, q, showResolved, hideDeprecated, entryId]);
 
   const counts = useMemo(
-    () => ({ all: logs.length, fail: logs.filter((l) => l.type === "fail").length, success: logs.filter((l) => l.type === "success").length, ref: logs.filter((l) => l.type === "ref").length }),
+    () => { const live = logs.filter((l) => l.status === "active"); return { all: live.length, fail: live.filter((l) => l.type === "fail").length, success: live.filter((l) => l.type === "success").length, ref: live.filter((l) => l.type === "ref").length, deprecated: logs.length - live.length }; },
     [logs],
   );
   const resolvedCount = useMemo(() => logs.filter((l) => l.id === l.root_id && l.resolved_at).length, [logs]);
@@ -199,22 +207,22 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
   const shown = groups.slice(0, limit);
 
   return (
-    <main className="grid grid-cols-[460px_1fr] items-start gap-6 p-8">
+    <main className="grid items-start gap-6 p-4 md:p-6 xl:grid-cols-[460px_1fr] xl:p-8">
       {flash && (
         <div role="status" className="fixed right-6 top-6 z-50 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-lg">
           <span className="text-ink">{flash}</span>
           <button type="button" onClick={() => setFlash(null)} className="rounded px-1 text-ink-muted hover:bg-primary-100" aria-label="닫기">×</button>
         </div>
       )}
-      <section>
-        <div className="mb-3 flex items-center justify-between gap-3">
+      <section className="min-w-0">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-bold text-ink">장애 건 타임라인</h2>
             <p className="mt-0.5 text-xs text-ink-muted">장애 건 › 원인(실패) › 해결(성공)·참고 순으로 이어집니다</p>
           </div>
-          <div className="relative">
+          <div className="relative w-full sm:w-60">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목 · 본문 · 오류 코드 · #키워드" className="h-9 w-60 pl-9" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목 · 본문 · 오류 코드 · #키워드" className="h-9 w-full pl-9" />
           </div>
         </div>
         <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -227,6 +235,12 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
             <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} className="size-3.5 accent-[var(--color-primary-700)]" />
             완료 건 표시 ({resolvedCount})
           </label>
+          {counts.deprecated > 0 && (
+            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+              <input type="checkbox" checked={!hideDeprecated} onChange={(e) => setHideDeprecated(!e.target.checked)} className="size-3.5 accent-[var(--color-primary-700)]" />
+              폐기 표시 ({counts.deprecated})
+            </label>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -235,7 +249,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
             return (
               <Card key={g.root.root_id} className={cn("gap-0 overflow-visible p-0", g.resolved && "opacity-80")}>
                 {/* 그룹 헤더 = 장애 건(메인 로그). 제목이 1행, 메타가 2행. 제목 클릭 = 루트 선택, 셰브론 = 펼침 */}
-                <div className={cn("flex items-start gap-3 px-4 py-3", g.root.id === entryId && "bg-primary-50")}>
+                <div className={cn("flex flex-wrap items-start gap-3 px-4 py-3", g.root.id === entryId && "bg-primary-50")}>
                   <button type="button" onClick={() => toggleGroup(g.root.root_id)} className="mt-1 shrink-0 rounded p-0.5 text-ink-muted hover:bg-primary-100" aria-expanded={isOpen} aria-label={isOpen ? "접기" : "펼치기"}>
                     <ChevronDown className={cn("size-4 transition-transform", !isOpen && "-rotate-90")} />
                   </button>
@@ -260,7 +274,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       </div>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <div className="flex shrink-0 flex-col items-end gap-1.5 max-sm:w-full max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:justify-end">
                     {g.root.type === "ref" ? null : g.resolved ? (
                       <Button variant="outline" size="xs" onClick={() => resolve(g.root, false)} title="완료 해제"><Undo2 className="size-3" /> 완료 해제</Button>
                     ) : (
@@ -289,12 +303,12 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       return (
                         <li key={l.id} ref={(el) => { if (el) cardRefs.current.set(l.id, el); else cardRefs.current.delete(l.id); }} className="relative mb-2.5 last:mb-0" style={{ marginLeft: depth * 18 }}>
                           <span className={cn("absolute -left-[25px] top-4 size-2.5 rounded-full ring-4 ring-card", dotTone[l.type])} />
-                          <div role="button" tabIndex={0} onClick={() => select(l.id)} onKeyDown={(e) => e.key === "Enter" && select(l.id)} className="block w-full text-left">
+                          <div onClick={() => select(l.id)} className={cn("block w-full text-left", g.dim.has(l.id) && "opacity-50")}>
                             <div className={cn("rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:bg-primary-50", selected && "border-primary-400 bg-primary-50")}>
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex min-w-0 items-center gap-2">
                                   <TypeBadge type={l.type} />
-                                  <span className={cn("truncate text-sm font-semibold text-ink", l.status === "deprecated" && "line-through opacity-60")}>{l.title}</span>
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); select(l.id); }} className={cn("min-w-0 truncate text-left text-sm font-semibold text-ink", l.status === "deprecated" && "line-through opacity-60")}>{l.title}</button>
                                 </div>
                                 <span className="shrink-0 text-xs text-ink-muted">{fmt(l.created_at)}</span>
                               </div>
@@ -350,7 +364,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
         </div>
       </section>
 
-      <Card className="p-6">
+      <Card className="min-w-0 p-6 xl:sticky xl:top-24">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="font-bold text-ink">해결 흐름</h2>

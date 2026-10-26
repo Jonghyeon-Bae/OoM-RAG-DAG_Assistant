@@ -48,16 +48,16 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
   const reduce = Math.round((1 - st.after_min / st.before_min) * 100);
   const fmt = (v: number | null) => (v == null ? "—" : v.toFixed(2));
   return (
-    <main className="flex flex-col gap-6 p-8">
+    <main className="flex flex-col gap-6 p-4 md:p-6 xl:p-8">
       {/* B-50 KPI */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <Kpi label="평균 정보 탐색 시간" value={<>{st.before_min}<span className="mx-1 text-ink-muted">→</span>{st.after_min}분</>} sub={`-${reduce}% 단축`} subTone="primary" sample={data.is_sample} />
         <Kpi label="Faithfulness" value={fmt(ev.faithfulness)} sub="답변이 근거에 충실한 정도" sample={data.is_sample} />
         <Kpi label="Answer Relevance" value={fmt(ev.answer_relevance)} sub="질문에 맞는 답인지" sample={data.is_sample} />
         <Kpi label="등록된 업무 로그" value={`${logs.total}건`} sub={`이번 주 +${logs.week}`} subTone="primary" />
       </div>
 
-      <div className="grid grid-cols-[1fr_360px] gap-6">
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         {/* B-51 */}
         <Card className="p-6">
           <div className="mb-6 flex items-center justify-between">

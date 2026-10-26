@@ -162,7 +162,7 @@ export function ParentPicker({
               </li>
             );
           })}
-          {filtered.length === 0 && <li className="px-3 py-4 text-center text-xs text-ink-muted">검색 결과가 없습니다</li>}
+          {filtered.length === 0 && <li className="px-3 py-4 text-center text-xs text-ink-muted">{q ? "검색 결과가 없습니다" : "아직 등록된 장애 건이 없습니다 — 위의 \u201c새 장애 건 시작\u201d으로 적으세요"}</li>}
           {filtered.length > 20 && <li className="px-3 py-2 text-center text-xs text-ink-muted">상위 20건만 표시 — 검색어로 좁혀 주세요</li>}
         </ul>
       </div>

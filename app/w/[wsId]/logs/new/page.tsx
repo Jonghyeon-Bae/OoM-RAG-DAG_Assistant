@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { Header } from "@/components/shell/Header";
-import { Chip } from "@/components/ui";
+import { WeeklyChip } from "@/components/shell/WeeklyChip";
 import { RegisterScreen } from "@/components/blocks/RegisterScreen";
 import { getChain, getLogs, getRecentLogs, getWeeklyCount, requestNonce } from "@/lib/api";
 import { resolveWs } from "@/lib/ws";
@@ -12,7 +12,7 @@ async function Content({ params, searchParams }: { params: Promise<{ wsId: strin
   const initialPreview = parent ? await getChain(ws.id, Number(parent)) : null;
   return (
     <>
-      <Header title="업무로그 등록" subtitle="짧게 적어도 됩니다. AI가 에러 코드·키워드·요약을 뽑아 검색되게 만듭니다" ws={ws} right={<Chip>이번 주 등록 {weekly}건</Chip>} />
+      <Header title="업무로그 등록" subtitle="짧게 적어도 됩니다. AI가 에러 코드·키워드·요약을 뽑아 검색되게 만듭니다" ws={ws} right={<WeeklyChip initial={weekly} />} />
       <RegisterScreen key={`${ws.id}-${parent ?? "none"}-${nonce}`} wsId={ws.id} candidates={items} initialRecent={recent} initialParent={parent} initialPreview={initialPreview} />
     </>
   );

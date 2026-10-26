@@ -18,7 +18,7 @@ export default async function WorkspaceLayout({
   const ws = await getWorkspace(Number(wsId));
   if (!ws) notFound();
   return (
-    <div className="flex min-h-screen flex-1">
+    <div className="flex min-h-screen flex-1 flex-col md:flex-row">
       <Sidebar wsId={ws.id} policyEnabled={ws.policy_enabled} />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>

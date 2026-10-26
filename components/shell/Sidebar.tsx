@@ -14,12 +14,12 @@ const nav = [
 export function Sidebar({ wsId, policyEnabled }: { wsId: number; policyEnabled: boolean }) {
   const pathname = usePathname();
   return (
-    <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar">
-      <Link href="/" className="flex h-20 items-center gap-2.5 px-6">
+    <aside className="sticky top-0 z-40 flex shrink-0 flex-col border-b border-border bg-sidebar md:h-screen md:w-60 md:border-b-0 md:border-r">
+      <Link href="/" className="flex h-14 items-center gap-2.5 px-4 md:h-20 md:px-6">
         <span className="flex size-8 items-center justify-center rounded-full bg-primary-700 text-sm font-bold text-white">O</span>
         <span className="text-lg font-bold text-ink">OoM Assist</span>
       </Link>
-      <nav className="flex flex-col gap-1 px-4">
+      <nav className="flex gap-1 overflow-x-auto px-3 pb-2 md:flex-col md:px-4 md:pb-0 [scrollbar-width:none]">
         {nav.map((item) => {
           const href = `/w/${wsId}/${item.href}`;
           const active = pathname.startsWith(href);
@@ -30,7 +30,7 @@ export function Sidebar({ wsId, policyEnabled }: { wsId: number; policyEnabled: 
               href={disabled ? "#" : href}
               aria-disabled={disabled}
               className={cn(
-                "flex h-12 items-center gap-3 rounded-xl px-4 text-sm font-medium transition-colors",
+                "flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium transition-colors md:h-12 md:gap-3 md:px-4",
                 active ? "bg-primary-700 text-white" : "text-ink hover:bg-primary-100",
                 disabled && "pointer-events-none opacity-40",
               )}
