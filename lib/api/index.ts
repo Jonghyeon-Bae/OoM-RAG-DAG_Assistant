@@ -6,8 +6,7 @@ import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
 import { connection } from "next/server";
 import { store, type StoreNode } from "@/lib/api/store";
-import policySeed from "@/mocks/policy_chunks.json";
-import type { PolicyRef, ChatEvent, Intent, Mode } from "@/lib/types/domain";
+import type { PolicyRef, ChatEvent, Intent, Mode, SearchSession, ChainEvent } from "@/lib/types/domain";
 
 export async function getWorkspaces(): Promise<Workspace[]> {
   return workspaces as Workspace[];
@@ -240,9 +239,13 @@ export async function createLog(
 
 // 질문과 청크의 단어 겹침으로 점수. hybrid_search_chunks() 어휘 검색의 거친 흉내 (목업 전용)
 export async function getPolicyChunks(wsId: number, query = ""): Promise<PolicyRef[]> {
-  const all = (policySeed as (PolicyRef & { workspace_id: number })[]).filter((c) => c.workspace_id === wsId);
+  // 단일 원천: 문서 관리의 store.docs(사용 중 문서만) × chunks.json. 폐기 문서는 인용되지 않는다 (FE-005 A3)
+  const seed = chunksSeed as Record<string, PolicyChunk[]>;
+  const all: PolicyRef[] = store.docs
+    .filter((d) => d.workspace_id === wsId && d.status === "active")
+    .flatMap((d) => (seed[d.slug] ?? []).map((c) => ({ ref: "", chunk_id: c.id, doc_id: d.id, doc_title: d.title, version: d.version, article_label: c.article_label, page: c.page ?? 0, text: c.text })));
   const words = query.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((w) => w.length >= 2);
-  if (!words.length) return all;
+  if (!words.length) return all.map((c, i) => ({ ...c, ref: `P${i + 1}` }));
   return all
     .map((c) => {
       const hay = `${c.doc_title} ${c.article_label} ${c.text}`.toLowerCase();
@@ -251,7 +254,7 @@ export async function getPolicyChunks(wsId: number, query = ""): Promise<PolicyR
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
-    .map((x, i) => ({ ...x.c, ref: `P${i + 1}` }));   // 마커는 순위대로 다시 부여
+    .map((x, i) => ({ ...x.c, ref: `P${i + 1}` })); // 마커는 순위대로 다시 부여
 }
 export interface MockAnswer {
   query: string;
@@ -269,15 +272,27 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
   const ws = await getWorkspace(wsId);
   const policy = ws?.policy_enabled ? await getPolicyChunks(wsId, query) : [];
 
-  // hybrid_search_nodes 1단계(에러 코드 정확 일치)만 흉내. 워크스페이스 범위 엄수
-  const code = /([A-Z]{1,4}-?\d{3,4}|HTTP\s?\d{3})/i.exec(query)?.[0]?.toUpperCase() ?? null;
-  const entry = code
-    ? store.nodes.find((n) => n.workspace_id === wsId && n.error_code?.toUpperCase() === code && n.type === "fail" && n.status === "active")
-    : undefined;
-  const chain = entry ? await getChain(wsId, entry.id) : null;
+  // hybrid_search_nodes 흉내 — 1단계 에러 코드 정확 일치, 2단계 제목·본문·키워드 단어 겹침(어휘 검색). 워크스페이스 범위 엄수
+  const live = store.nodes.filter((n) => n.workspace_id === wsId && n.status === "active");
+  const code = /([A-Z]{1,4}-?\d{3,4}|HTTP\s?\d{3})/i.exec(query)?.[0]?.toUpperCase().replace(/\s+/, " ") ?? null;
+  let entry = code ? live.find((n) => n.error_code?.toUpperCase() === code && n.type === "fail") : undefined;
+  if (!entry) {
+    const words = query.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((w) => w.length >= 2);
+    const scored = live
+      .map((n) => {
+        const hay = `${n.title} ${n.body} ${n.keywords.join(" ")}`.toLowerCase();
+        return { n, score: words.filter((w) => hay.includes(w)).length };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score || (a.n.type === "fail" ? -1 : 1));
+    entry = scored[0]?.n;
+  }
+  // 체인은 항상 장애 건(루트) 기준으로 묶는다 — 하위 로그가 걸려도 흐름 전체가 보이게
+  const chain = entry ? await getChain(wsId, rootOf(entry.id)) : null;
 
   // 마커: 규정 P1…, 체인 N1…(depth 순). Critic은 이 집합과 답변 속 마커를 대조한다
-  const nodes = chain ? [...chain.nodes].sort((a, b) => a.depth - b.depth || a.id - b.id) : [];
+  // 번호 = 화면 블록 표시 순서(깊이 열 → 열 안은 체인 순서). 안정 정렬이라 같은 깊이는 원래 순서 유지 (FE-005 §8)
+  const nodes = chain ? [...chain.nodes].sort((a, b) => a.depth - b.depth) : [];
   const nref = new Map(nodes.map((n, i) => [n.id, `N${i + 1}`]));
   const mark = (id: number) => `[${nref.get(id)}]`;
 
@@ -288,12 +303,13 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
   const fails = nodes.filter((n) => n.type === "fail");
   const fixes = nodes.filter((n) => n.type === "success" && n.status === "active");
   const head = fails[0] ?? nodes[0];
+  // 마커는 문장 뒤에 붙인다. 화면에서 [N1]은 "해결 흐름의 1번 기록", [P1]은 "규정 조항 1"로 풀어 보여준다
   const chain_text = head
     ? [
-        `${head.title} ${mark(head.id)}`,
-        fails.length > 1 ? `은(는) ${fails.slice(1).map((n) => `${n.title} ${mark(n.id)}`).join(", ")}이 원인으로 등록되어 있으며,` : "에 대해",
-        fixes.length ? `${fixes.map((n) => `${n.title} ${mark(n.id)}`).join(", ")}로 해소되었습니다.` : "아직 확인된 해결 로그가 없습니다.",
-      ].join(" ")
+        `비슷한 장애 건 「${head.title}」${mark(head.id)}이 등록되어 있습니다.`,
+        fails.length > 1 ? `원인은 ${fails.slice(1).map((n) => `「${n.title.replace(/^원인:?\s*/, "")}」${mark(n.id)}`).join(", ")}으로 기록되어 있고,` : "",
+        fixes.length ? `${fixes.map((n) => `「${n.title.replace(/^해결:?\s*/, "")}」${mark(n.id)}`).join(", ")}로 해결됐습니다.` : "아직 확인된 해결 기록은 없습니다.",
+      ].filter(Boolean).join(" ")
     : null;
 
   const used = [...new Set([...`${policy_text ?? ""} ${chain_text ?? ""}`.matchAll(/\[([PN]\d+)\]/g)].map((m) => m[1]))];
@@ -317,12 +333,14 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let mockSession = 1000;
 
-export async function* mockChatEvents(wsId: number, query: string): AsyncGenerator<ChatEvent> {
+export async function* mockChatEvents(wsId: number, query: string, actor = "배종현"): AsyncGenerator<ChatEvent> {
   const t0 = Date.now();
   const ws = await getWorkspace(wsId);
   const mode: Mode = ws?.policy_enabled ? "policy" : "dag_only";
 
-  yield { event: "session", data: { session_id: ++mockSession } };
+  const sessionId = ++mockSession;
+  yield { event: "session", data: { session_id: sessionId } };
+  let chainEvent: ChainEvent | null = null;
 
   // supervisor — DAG 단일은 분류 생략, 규정 결합은 LLM 분류 1회 흉내
   yield { event: "stage", data: { node: "supervisor", status: "start" } };
@@ -345,17 +363,15 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
     await sleep(250);
     if (a.chain) {
       const ref = new Map(a.chain_refs.map((r) => [r.id, r.ref]));
-      yield {
-        event: "chain",
-        data: {
+      chainEvent = {
           entry_id: a.chain.entry_id,
           edges: a.chain.edges,
           nodes: a.chain.nodes.map((n) => ({
             ref: ref.get(n.id)!, id: n.id, type: n.type, status: n.status, title: n.title,
             depth: n.depth, path_label: n.path_label, last_confirmed_at: n.last_confirmed_at,
           })),
-        },
       };
+      yield { event: "chain", data: chainEvent };
     }
     yield { event: "stage", data: { node: "graph_search", status: "done" } };
   }
@@ -367,7 +383,7 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
   yield { event: "stage", data: { node: "gate", status: "done", detail: hasContext ? undefined : "근거 없음" } };
 
   const text = hasContext
-    ? [a.policy_text && `## 규정 근거\n${a.policy_text}`, a.chain_text && `## 유사 장애 해결 사례 (DAG 체인)\n${a.chain_text}`].filter(Boolean).join("\n\n")
+    ? [a.policy_text && `## 규정 근거\n${a.policy_text}`, a.chain_text && `## 비슷한 장애 건의 해결 흐름\n${a.chain_text}`].filter(Boolean).join("\n\n")
     : "등록된 규정이나 과거 해결 사례에서 이 질문의 근거를 찾지 못했습니다. 질문을 바꾸거나 관련 로그를 먼저 등록해 주세요.";
 
   // generate — 토큰 스트리밍 흉내
@@ -394,6 +410,9 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
     ...a.policy.map((p) => [p.ref, p.chunk_id] as const),
     ...a.chain_refs.map((r) => [r.ref, String(r.id)] as const),
   ]);
+  const latency = { retrieval_ms, first_token_ms, total_ms: Date.now() - t0 };
+  // 검색 내역 저장 (실서버: Python이 시작 시 INSERT, Spring이 done 가로채 UPDATE + answer_text)
+  store.sessions.push({ id: sessionId, workspace_id: wsId, user_name: actor, query, intent, mode, answer_text: text, policy: a.policy, chain: chainEvent, citations: { verified: a.verified, unverified: a.unverified }, latency, score: null, created_at: new Date().toISOString() });
   yield {
     event: "done",
     data: {
@@ -401,9 +420,48 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
       retrieved_ids: [...refToId.values()],
       verified_ids: a.verified.map((r) => refToId.get(r)!),
       unverified_ids: a.unverified,
-      latency: { retrieval_ms, first_token_ms, total_ms: Date.now() - t0 },
+      latency,
       model: "mock", prompt_tokens: 0, completion_tokens: Math.ceil(text.length / 2),
     },
+  };
+}
+
+// ---- 검색 내역
+export async function getSessions(wsId: number, limit = 30): Promise<SearchSession[]> {
+  await connection();
+  return store.sessions.filter((x) => x.workspace_id === wsId).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
+}
+export async function getSession(wsId: number, id: number): Promise<SearchSession | null> {
+  return store.sessions.find((x) => x.id === id && x.workspace_id === wsId) ?? null;
+}
+export async function setSessionScore(wsId: number, id: number, score: 1 | -1 | null): Promise<SearchSession | null> {
+  const x = store.sessions.find((s) => s.id === id && s.workspace_id === wsId);
+  if (!x) return null;
+  x.score = score;
+  return x;
+}
+
+// R-24 2차 지표. 실서버: search_sessions·log_nodes 집계 쿼리 (BE-REQ-001 §대시보드 2차)
+function secondBatch(wsId: number, roots: LogNode[], since: number): Pick<DashboardSummary, "queries" | "no_evidence" | "resolve_time" | "reused"> {
+  const ss = store.sessions.filter((x) => x.workspace_id === wsId);
+  const byIntent = (["policy", "troubleshoot", "both"] as Intent[]).map((intent) => ({ intent, count: ss.filter((x) => x.intent === intent).length }));
+  const noEv = ss.filter((x) => x.citations.verified.length === 0);
+  const resolved = roots.filter((r) => r.resolved_at).map((r) => (Date.parse(r.resolved_at!) - Date.parse(r.created_at)) / 3600_000).sort((a, b) => a - b);
+  const median = resolved.length ? resolved[Math.floor(resolved.length / 2)] : null;
+  // 인용 횟수: 세션의 verified 마커(N#) → chain 노드 id. 폐기 노드 제외
+  const cnt = new Map<number, number>();
+  ss.forEach((x) => x.chain && x.citations.verified.forEach((ref) => { const n = x.chain!.nodes.find((c) => c.ref === ref); if (n) cnt.set(n.id, (cnt.get(n.id) ?? 0) + 1); }));
+  const reused = [...cnt.entries()]
+    .map(([id, count]) => ({ id, count, n: store.nodes.find((x) => x.id === id) }))
+    .filter((x) => x.n && x.n.status === "active")
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+    .map((x) => ({ node_id: x.id, title: x.n!.title, type: x.n!.type, author_name: x.n!.author_name, count: x.count }));
+  return {
+    queries: { week: ss.filter((x) => Date.parse(x.created_at) >= since).length, total: ss.length, by_intent: byIntent },
+    no_evidence: { rate: ss.length ? Math.round((noEv.length / ss.length) * 100) : null, recent: noEv.slice(-5).reverse().map((x) => ({ session_id: x.id, query: x.query, intent: x.intent, created_at: x.created_at })) },
+    resolve_time: { median_hours: median === null ? null : Math.round(median * 10) / 10, sample: resolved.length },
+    reused,
   };
 }
 
@@ -432,8 +490,13 @@ export async function getDashboardSummary(wsId: number): Promise<DashboardSummar
       resolved_roots: roots.filter((r) => !!r.resolved_at).length,
       refine_failed: all.filter((l) => l.refine_status === "failed").length,
     },
-    feedback: { up: 0, down: 0 },
-    latency_ms: { retrieval: null, first_token: null, total: null },
+    feedback: { up: store.sessions.filter((x) => x.workspace_id === wsId && x.score === 1).length, down: store.sessions.filter((x) => x.workspace_id === wsId && x.score === -1).length },
+    latency_ms: (() => {
+      const ss = store.sessions.filter((x) => x.workspace_id === wsId);
+      const avg = (f: (x: SearchSession) => number) => (ss.length ? Math.round(ss.reduce((m, x) => m + f(x), 0) / ss.length) : null);
+      return { retrieval: avg((x) => x.latency.retrieval_ms), first_token: avg((x) => x.latency.first_token_ms), total: avg((x) => x.latency.total_ms) };
+    })(),
+    ...secondBatch(wsId, roots, since),
   };
 }
 

@@ -4,18 +4,24 @@ import { Chip, cn } from "@/components/ui";
 import type { PolicyRef } from "@/lib/types/domain";
 
 // JSON 근거 카드 (03 안건 A). 청크 텍스트를 ①②③ 항 단위로 쪼개 전부 하이라이트. react-pdf 원문은 Tier 2.
-export function SourceViewer({ sources, activeRef, onSelect }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void }) {
+export function SourceViewer({ sources, activeRef, onSelect, context }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void; context?: { query: string; onBack: () => void } }) {
   const active = sources.find((s) => s.ref === activeRef) ?? sources[0];
   const clauses = active ? active.text.split(/(?=[①②③④⑤⑥⑦⑧⑨])/).map((s) => s.trim()).filter(Boolean) : [];
 
   return (
     // 오른쪽 패널: 흰 바탕 + 테두리 + 왼쪽 강조선으로 대화 영역과 구분, 스크롤해도 따라오게 sticky
-    <aside className="sticky top-8 flex max-h-[calc(100vh-7rem)] flex-col gap-3 overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm">
+    <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between border-b border-border pb-3">
-        <h2 className="font-bold text-ink">출처 원문 뷰어</h2>
-        <Chip tone="primary" className="text-[11px]">근거 하이라이트</Chip>
+        <h2 className="font-bold text-ink">규정 원문</h2>
+        <Chip tone="primary" className="text-[11px]" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
       </div>
 
+      {context && (
+        <div className="flex items-start gap-2 rounded-lg bg-warn-bg/60 px-3 py-2 text-xs text-ink">
+          <span className="min-w-0 flex-1">이전 질문의 근거: <b className="line-clamp-1">{context.query}</b></span>
+          <button type="button" onClick={context.onBack} className="shrink-0 font-medium text-primary-700 hover:underline">최신으로</button>
+        </div>
+      )}
       {sources.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-ink-muted">답변에 인용된 규정 조항이 여기에 표시됩니다.</div>
       ) : (
@@ -23,7 +29,7 @@ export function SourceViewer({ sources, activeRef, onSelect }: { sources: Policy
           <div className="flex flex-wrap gap-2">
             {sources.map((s) => (
               <button key={s.ref} type="button" onClick={() => onSelect(s.ref)} className={cn("rounded-full px-3 py-1.5 text-xs font-medium transition-colors", s.ref === active?.ref ? "bg-primary-700 text-white" : "bg-ref-bg text-ref hover:bg-primary-100")}>
-                [{s.ref}] {s.doc_title.split("·")[0]} p.{s.page}
+                규정 {s.ref.slice(1)} · {s.doc_title.split("·")[0]} p.{s.page}
               </button>
             ))}
           </div>

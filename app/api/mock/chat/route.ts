@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { mockChatEvents } from "@/lib/api";
+import { actorFromRequest } from "@/lib/api/session";
 
 // 가짜 Spring 릴레이. 이벤트 생성은 lib/api/index.ts, 여기선 text/event-stream 으로 흘리기만.
 export async function POST(req: NextRequest) {
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const e of mockChatEvents(ws, query)) {
+        for await (const e of mockChatEvents(ws, query, actorFromRequest(req).name)) {
           if (req.signal.aborted) break;                                   // 브라우저가 중지 누름
           controller.enqueue(enc.encode(`event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`));
         }
