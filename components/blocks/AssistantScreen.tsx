@@ -90,6 +90,11 @@ const stageLabel: { node: StageNode; label: string; hint: string }[] = [
   { node: "critic", label: "출처 검증", hint: "답변 속 번호가 실제 근거와 맞는지 대조합니다" },
 ];
 const intentLabel: Record<Intent, string> = { policy: "규정 확인", troubleshoot: "장애 해결", both: "규정 + 해결 사례" };
+// B-11 추천 질문: 워크스페이스 모드별 정적 3개. 실서버 전환 후에도 정적 유지(검색 내역 기반 추천은 R-목록)
+const suggestions = (policy: boolean): string[] =>
+  policy
+    ? ["외근 중 VPN 접속하면 E-403이 떠요. 왜 그런가요?", "원격접속 신청 기간은 최대 며칠인가요?", "접속이 차단되면 어디서 확인하나요?"]
+    : ["VPN E-403이 반복돼요. 해결한 사례 있나요?", "게이트웨이 시간이 어긋나서 토큰이 만료되는 것 같아요", "FAQ 연동 API 504 타임아웃 원인이 뭐였나요?"];
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
 export function AssistantScreen({ ws }: { ws: Workspace }) {
@@ -203,7 +208,11 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
           {state.turns.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center text-sm text-ink-muted">
               <p className="font-medium text-ink">{policyMode ? "규정 근거와 과거 장애 해결 사례를 한 번에 물어보세요." : "이 워크스페이스는 해결 사례만 검색합니다. 겪고 있는 오류나 증상을 물어보세요."}</p>
-              <p>예: &ldquo;외근 중 VPN 접속하면 E-403이 떠요&rdquo;</p>
+              <div className="mt-1 flex flex-wrap justify-center gap-2">
+                {suggestions(policyMode).map((q) => (
+                  <button key={q} type="button" onClick={() => ask(q)} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-ink hover:bg-primary-50">{q}</button>
+                ))}
+              </div>
               <button type="button" onClick={toggleHistory} className="mt-2 inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs text-ink hover:bg-primary-50"><History className="size-3" /> 이전에 물어본 것 보기</button>
               {history.open && <div className="w-full max-w-xl text-left"><HistoryPanel history={history} onPick={reopen} onClose={() => setHistory((h) => ({ ...h, open: false }))} /></div>}
             </div>
@@ -226,7 +235,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
                       <span className="mt-1 block text-right text-[11px] text-white/60">{fmtTime(t.askedAt)}</span>
                     </div>
                     {isLast && <PipelineBadges turn={t} />}
-                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} wsId={ws.id} collapsed={!isLast} highlighted={sourceIndex === i && !isLast} activeNode={sourceIndex === i ? activeNode : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onVote={(v) => vote(i, v)} />
+                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} wsId={ws.id} collapsed={!isLast} highlighted={sourceIndex === i && !isLast} activeNode={sourceIndex === i ? activeNode : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} />
                   </div>
                 );
               })}
@@ -312,7 +321,7 @@ function PipelineBadges({ turn }: { turn: Turn }) {
 }
 
 // ── 답변 카드 ───────────────────────────────────────────────────────────────
-function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, onCite, onVote }: { turn: Turn; wsId: number; collapsed: boolean; highlighted: boolean; activeNode: number | null; onOpen: () => void; onCite: (ref: string) => void; onVote: (v: 1 | -1 | null) => void }) {
+function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, onCite, onVote, onRetry }: { turn: Turn; wsId: number; collapsed: boolean; highlighted: boolean; activeNode: number | null; onOpen: () => void; onCite: (ref: string) => void; onVote: (v: 1 | -1 | null) => void; onRetry?: () => void }) {
   const [open, setOpen] = useState(!collapsed);
   const c = turn.citations;
   const tone = (ref: string) => (!c ? "neutral" : c.verified.includes(ref) ? "primary" : c.unverified.includes(ref) ? "warn" : "neutral");
@@ -401,7 +410,12 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
         </div>
       )}
 
-      {turn.status === "error" && <p className="mt-4 text-sm text-fail">{turn.error}</p>}
+      {turn.status === "error" && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-fail-bg/50 px-3 py-2 text-sm">
+          <span className="text-fail">{turn.error ?? "연결이 끊겼습니다"}</span>
+          {onRetry && <Button size="xs" variant="outline" onClick={onRetry}><RotateCcw className="size-3" /> 다시 시도</Button>}
+        </div>
+      )}
 
       {turn.status === "done" && (
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4 text-xs">

@@ -125,6 +125,11 @@ export interface DashboardSummary {
   logs: { total: number; week: number; open_roots: number; resolved_roots: number; refine_failed: number };
   feedback: { up: number; down: number };
   latency_ms: { retrieval: number | null; first_token: number | null; total: number | null };
+  // R-24 2차 (UX-002 1~4). 원천: search_sessions·log_nodes. 모두 서버 집계
+  queries: { week: number; total: number; by_intent: { intent: Intent; count: number }[] };
+  no_evidence: { rate: number | null; recent: { session_id: number; query: string; intent: Intent; created_at: string }[] }; // 근거 없음 = verified 0건
+  resolve_time: { median_hours: number | null; sample: number }; // 완료된 장애 건: created_at → resolved_at
+  reused: { node_id: number; title: string; type: LogType; author_name: string; count: number }[]; // 인용 횟수 Top 5
 }
 
 export type DocStatus = "active" | "retired";

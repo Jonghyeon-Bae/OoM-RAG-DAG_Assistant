@@ -291,7 +291,8 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
   const chain = entry ? await getChain(wsId, rootOf(entry.id)) : null;
 
   // 마커: 규정 P1…, 체인 N1…(depth 순). Critic은 이 집합과 답변 속 마커를 대조한다
-  const nodes = chain ? [...chain.nodes].sort((a, b) => a.depth - b.depth || a.id - b.id) : [];
+  // 번호 = 화면 블록 표시 순서(깊이 열 → 열 안은 체인 순서). 안정 정렬이라 같은 깊이는 원래 순서 유지 (FE-005 §8)
+  const nodes = chain ? [...chain.nodes].sort((a, b) => a.depth - b.depth) : [];
   const nref = new Map(nodes.map((n, i) => [n.id, `N${i + 1}`]));
   const mark = (id: number) => `[${nref.get(id)}]`;
 
@@ -440,6 +441,30 @@ export async function setSessionScore(wsId: number, id: number, score: 1 | -1 | 
   return x;
 }
 
+// R-24 2차 지표. 실서버: search_sessions·log_nodes 집계 쿼리 (BE-REQ-001 §대시보드 2차)
+function secondBatch(wsId: number, roots: LogNode[], since: number): Pick<DashboardSummary, "queries" | "no_evidence" | "resolve_time" | "reused"> {
+  const ss = store.sessions.filter((x) => x.workspace_id === wsId);
+  const byIntent = (["policy", "troubleshoot", "both"] as Intent[]).map((intent) => ({ intent, count: ss.filter((x) => x.intent === intent).length }));
+  const noEv = ss.filter((x) => x.citations.verified.length === 0);
+  const resolved = roots.filter((r) => r.resolved_at).map((r) => (Date.parse(r.resolved_at!) - Date.parse(r.created_at)) / 3600_000).sort((a, b) => a - b);
+  const median = resolved.length ? resolved[Math.floor(resolved.length / 2)] : null;
+  // 인용 횟수: 세션의 verified 마커(N#) → chain 노드 id. 폐기 노드 제외
+  const cnt = new Map<number, number>();
+  ss.forEach((x) => x.chain && x.citations.verified.forEach((ref) => { const n = x.chain!.nodes.find((c) => c.ref === ref); if (n) cnt.set(n.id, (cnt.get(n.id) ?? 0) + 1); }));
+  const reused = [...cnt.entries()]
+    .map(([id, count]) => ({ id, count, n: store.nodes.find((x) => x.id === id) }))
+    .filter((x) => x.n && x.n.status === "active")
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+    .map((x) => ({ node_id: x.id, title: x.n!.title, type: x.n!.type, author_name: x.n!.author_name, count: x.count }));
+  return {
+    queries: { week: ss.filter((x) => Date.parse(x.created_at) >= since).length, total: ss.length, by_intent: byIntent },
+    no_evidence: { rate: ss.length ? Math.round((noEv.length / ss.length) * 100) : null, recent: noEv.slice(-5).reverse().map((x) => ({ session_id: x.id, query: x.query, intent: x.intent, created_at: x.created_at })) },
+    resolve_time: { median_hours: median === null ? null : Math.round(median * 10) / 10, sample: resolved.length },
+    reused,
+  };
+}
+
 // 대시보드 요약 — 로그 집계는 저장소 실시간, 탐색 시간·평가는 실측 전 예시값(is_sample)
 export async function getDashboardSummary(wsId: number): Promise<DashboardSummary> {
   await connection();
@@ -471,6 +496,7 @@ export async function getDashboardSummary(wsId: number): Promise<DashboardSummar
       const avg = (f: (x: SearchSession) => number) => (ss.length ? Math.round(ss.reduce((m, x) => m + f(x), 0) / ss.length) : null);
       return { retrieval: avg((x) => x.latency.retrieval_ms), first_token: avg((x) => x.latency.first_token_ms), total: avg((x) => x.latency.total_ms) };
     })(),
+    ...secondBatch(wsId, roots, since),
   };
 }
 
