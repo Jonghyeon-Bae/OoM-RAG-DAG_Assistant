@@ -232,8 +232,9 @@
     "last_confirmed_at": null,
     "created_at": "2026-10-10T06:00:00Z",
     "resolved_at": null,
-    "deprecated_via": null,
-    "resolve_note": null,
-    "deprecate_reason": null
-  }
+    "deprecated_via": null
+  },
+  { "id": 111, "workspace_id": 2, "type": "fail", "status": "active", "title": "VPN 접속 시 E-403 반복 발생", "body": "외근 중 VPN 접속 시 E-403. 승인 기간 내인데도 거부됨.", "author_name": "신동준", "path_label": "root.e403", "error_code": "E-403", "keywords": ["VPN", "E-403", "인증"], "resolution_summary": "증상: 승인 기간 내 E-403 거부", "refine_status": "done", "last_confirmed_at": null, "created_at": "2026-10-09T05:20:00Z", "resolved_at": null, "deprecated_via": null },
+  { "id": 112, "workspace_id": 2, "type": "fail", "status": "active", "title": "원인: 토큰 갱신 배치 누락", "body": "09:00 토큰 갱신 배치가 중단되어 만료 토큰으로 접속 시도.", "author_name": "신동준", "path_label": "root.e403.cause1", "error_code": "E-403", "keywords": ["토큰", "배치", "갱신"], "resolution_summary": "원인: 갱신 배치 중단", "refine_status": "done", "last_confirmed_at": null, "created_at": "2026-10-09T06:00:00Z", "resolved_at": null, "deprecated_via": null },
+  { "id": 113, "workspace_id": 2, "type": "success", "status": "active", "title": "해결: 갱신 주기 30분 조정", "body": "배치 주기를 30분으로 바꾸고 모니터링 추가. 이후 재발 0건.", "author_name": "신동준", "path_label": "root.e403.cause1.fix1", "error_code": "E-403", "keywords": ["갱신 주기", "30분"], "resolution_summary": "갱신 주기 30분 조정 — 재발 0건", "refine_status": "done", "last_confirmed_at": "2026-10-10T01:00:00Z", "created_at": "2026-10-09T07:30:00Z", "resolved_at": null, "deprecated_via": null }
 ]

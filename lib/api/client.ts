@@ -1,5 +1,5 @@
 // 클라이언트 컴포넌트용. 목업 라우트(app/api/mock) → 3단계에서 NEXT_PUBLIC_API_BASE 로 교체.
-import type { Chain, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent } from "@/lib/types/domain";
+import type { Chain, ChatEvent, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent } from "@/lib/types/domain";
 
 const base = process.env.NEXT_PUBLIC_API_BASE ?? "/api/mock";
 const headers = (wsId: number) => ({ "Content-Type": "application/json", "X-Workspace-Id": String(wsId) });
@@ -51,6 +51,43 @@ export async function patchResolved(wsId: number, id: number, resolved: boolean,
   if (r.ok) return { ok: true, node: await r.json() };
   const j = await r.json().catch(() => ({}));
   return { ok: false, code: j.code, message: j.message ?? `완료 처리 실패 (${r.status})` };
+}
+
+// 채팅 SSE 수신. "event: 이름 / data: JSON" 블록을 \n\n 단위로 파싱해 onEvent 로 넘긴다. Spring 릴레이도 같은 형식.
+export async function streamChat(wsId: number, query: string, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
+  const r = await fetch(`${base}/chat`, {
+    method: "POST",
+    headers: { ...headers(wsId), Accept: "text/event-stream" },
+    body: JSON.stringify({ query }),
+    signal,
+  });
+  if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
+
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+    let i: number;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const block = buf.slice(0, i);
+      buf = buf.slice(i + 2);
+      let event = "message";
+      const data: string[] = [];
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        else if (line.startsWith("data:")) data.push(line.slice(5).replace(/^ /, ""));
+      }
+      if (!data.length) continue;
+      try {
+        onEvent({ event, data: JSON.parse(data.join("\n")) } as ChatEvent);
+      } catch {
+        /* 깨진 블록은 무시 */
+      }
+    }
+  }
 }
 
 export async function patchDocStatus(wsId: number, id: number, status: DocStatus, reason?: string): Promise<PolicyDocument | null> {
