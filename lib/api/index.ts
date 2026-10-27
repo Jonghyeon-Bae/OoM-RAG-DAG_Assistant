@@ -6,7 +6,6 @@ import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
 import { connection } from "next/server";
 import { store, type StoreNode } from "@/lib/api/store";
-import policySeed from "@/mocks/policy_chunks.json";
 import type { PolicyRef, ChatEvent, Intent, Mode } from "@/lib/types/domain";
 
 export async function getWorkspaces(): Promise<Workspace[]> {
@@ -240,9 +239,13 @@ export async function createLog(
 
 // 질문과 청크의 단어 겹침으로 점수. hybrid_search_chunks() 어휘 검색의 거친 흉내 (목업 전용)
 export async function getPolicyChunks(wsId: number, query = ""): Promise<PolicyRef[]> {
-  const all = (policySeed as (PolicyRef & { workspace_id: number })[]).filter((c) => c.workspace_id === wsId);
+  // 단일 원천: 문서 관리의 store.docs(사용 중 문서만) × chunks.json. 폐기 문서는 인용되지 않는다 (FE-005 A3)
+  const seed = chunksSeed as Record<string, PolicyChunk[]>;
+  const all: PolicyRef[] = store.docs
+    .filter((d) => d.workspace_id === wsId && d.status === "active")
+    .flatMap((d) => (seed[d.slug] ?? []).map((c) => ({ ref: "", chunk_id: c.id, doc_id: d.id, doc_title: d.title, version: d.version, article_label: c.article_label, page: c.page ?? 0, text: c.text })));
   const words = query.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((w) => w.length >= 2);
-  if (!words.length) return all;
+  if (!words.length) return all.map((c, i) => ({ ...c, ref: `P${i + 1}` }));
   return all
     .map((c) => {
       const hay = `${c.doc_title} ${c.article_label} ${c.text}`.toLowerCase();
@@ -251,7 +254,7 @@ export async function getPolicyChunks(wsId: number, query = ""): Promise<PolicyR
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
-    .map((x, i) => ({ ...x.c, ref: `P${i + 1}` }));   // 마커는 순위대로 다시 부여
+    .map((x, i) => ({ ...x.c, ref: `P${i + 1}` })); // 마커는 순위대로 다시 부여
 }
 export interface MockAnswer {
   query: string;
@@ -288,12 +291,13 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
   const fails = nodes.filter((n) => n.type === "fail");
   const fixes = nodes.filter((n) => n.type === "success" && n.status === "active");
   const head = fails[0] ?? nodes[0];
+  // 마커는 문장 뒤에 붙인다. 화면에서 [N1]은 "해결 흐름의 1번 기록", [P1]은 "규정 조항 1"로 풀어 보여준다
   const chain_text = head
     ? [
-        `${head.title} ${mark(head.id)}`,
-        fails.length > 1 ? `은(는) ${fails.slice(1).map((n) => `${n.title} ${mark(n.id)}`).join(", ")}이 원인으로 등록되어 있으며,` : "에 대해",
-        fixes.length ? `${fixes.map((n) => `${n.title} ${mark(n.id)}`).join(", ")}로 해소되었습니다.` : "아직 확인된 해결 로그가 없습니다.",
-      ].join(" ")
+        `비슷한 장애 건 「${head.title}」${mark(head.id)}이 등록되어 있습니다.`,
+        fails.length > 1 ? `원인은 ${fails.slice(1).map((n) => `「${n.title.replace(/^원인:?\s*/, "")}」${mark(n.id)}`).join(", ")}으로 기록되어 있고,` : "",
+        fixes.length ? `${fixes.map((n) => `「${n.title.replace(/^해결:?\s*/, "")}」${mark(n.id)}`).join(", ")}로 해결됐습니다.` : "아직 확인된 해결 기록은 없습니다.",
+      ].filter(Boolean).join(" ")
     : null;
 
   const used = [...new Set([...`${policy_text ?? ""} ${chain_text ?? ""}`.matchAll(/\[([PN]\d+)\]/g)].map((m) => m[1]))];
@@ -367,7 +371,7 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
   yield { event: "stage", data: { node: "gate", status: "done", detail: hasContext ? undefined : "근거 없음" } };
 
   const text = hasContext
-    ? [a.policy_text && `## 규정 근거\n${a.policy_text}`, a.chain_text && `## 유사 장애 해결 사례 (DAG 체인)\n${a.chain_text}`].filter(Boolean).join("\n\n")
+    ? [a.policy_text && `## 규정 근거\n${a.policy_text}`, a.chain_text && `## 비슷한 장애 건의 해결 흐름\n${a.chain_text}`].filter(Boolean).join("\n\n")
     : "등록된 규정이나 과거 해결 사례에서 이 질문의 근거를 찾지 못했습니다. 질문을 바꾸거나 관련 로그를 먼저 등록해 주세요.";
 
   // generate — 토큰 스트리밍 흉내

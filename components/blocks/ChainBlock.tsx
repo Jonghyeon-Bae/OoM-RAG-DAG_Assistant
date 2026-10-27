@@ -27,7 +27,7 @@ export function ChainNodeCard({ node, compact = false, selected = false }: { nod
         {deprecated && <span className="ml-auto rounded-full bg-warn-bg px-2 py-0.5 text-[11px] text-warn">폐기</span>}
       </div>
       <div className="mt-1 text-sm font-semibold leading-snug">{node.title}</div>
-      {!compact && (node.note || node.path_label) && (
+      {(node.note || (!compact && node.path_label)) && (
         <div className="mt-1 text-xs opacity-80">{node.note ?? node.path_label}</div>
       )}
     </div>
