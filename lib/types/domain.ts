@@ -97,6 +97,23 @@ export type ChatEvent =
   | { event: "done"; data: DoneEvent }
   | { event: "error"; data: { message: string; node?: StageNode } };
 
+// 검색 내역 1행 = 질문 1건. 답변 본문·근거를 함께 저장해 재검색 없이 다시 본다 (BE-REQ-001 S13)
+export interface SearchSession {
+  id: number;
+  workspace_id: number;
+  user_name: string;
+  query: string;
+  intent: Intent;
+  mode: Mode;
+  answer_text: string;
+  policy: PolicyRef[];
+  chain: ChainEvent | null;
+  citations: CitationsEvent;
+  latency: DoneEvent["latency"];
+  score: 1 | -1 | null; // answer_feedback
+  created_at: string;
+}
+
 export interface DashboardSummary {
   is_sample: boolean; // true면 "예시 데이터" 라벨
   search_time: {

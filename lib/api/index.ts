@@ -6,7 +6,7 @@ import workspaces from "@/mocks/workspaces.json";
 import users from "@/mocks/users.json";
 import { connection } from "next/server";
 import { store, type StoreNode } from "@/lib/api/store";
-import type { PolicyRef, ChatEvent, Intent, Mode } from "@/lib/types/domain";
+import type { PolicyRef, ChatEvent, Intent, Mode, SearchSession, ChainEvent } from "@/lib/types/domain";
 
 export async function getWorkspaces(): Promise<Workspace[]> {
   return workspaces as Workspace[];
@@ -272,12 +272,23 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
   const ws = await getWorkspace(wsId);
   const policy = ws?.policy_enabled ? await getPolicyChunks(wsId, query) : [];
 
-  // hybrid_search_nodes 1단계(에러 코드 정확 일치)만 흉내. 워크스페이스 범위 엄수
-  const code = /([A-Z]{1,4}-?\d{3,4}|HTTP\s?\d{3})/i.exec(query)?.[0]?.toUpperCase() ?? null;
-  const entry = code
-    ? store.nodes.find((n) => n.workspace_id === wsId && n.error_code?.toUpperCase() === code && n.type === "fail" && n.status === "active")
-    : undefined;
-  const chain = entry ? await getChain(wsId, entry.id) : null;
+  // hybrid_search_nodes 흉내 — 1단계 에러 코드 정확 일치, 2단계 제목·본문·키워드 단어 겹침(어휘 검색). 워크스페이스 범위 엄수
+  const live = store.nodes.filter((n) => n.workspace_id === wsId && n.status === "active");
+  const code = /([A-Z]{1,4}-?\d{3,4}|HTTP\s?\d{3})/i.exec(query)?.[0]?.toUpperCase().replace(/\s+/, " ") ?? null;
+  let entry = code ? live.find((n) => n.error_code?.toUpperCase() === code && n.type === "fail") : undefined;
+  if (!entry) {
+    const words = query.toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((w) => w.length >= 2);
+    const scored = live
+      .map((n) => {
+        const hay = `${n.title} ${n.body} ${n.keywords.join(" ")}`.toLowerCase();
+        return { n, score: words.filter((w) => hay.includes(w)).length };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score || (a.n.type === "fail" ? -1 : 1));
+    entry = scored[0]?.n;
+  }
+  // 체인은 항상 장애 건(루트) 기준으로 묶는다 — 하위 로그가 걸려도 흐름 전체가 보이게
+  const chain = entry ? await getChain(wsId, rootOf(entry.id)) : null;
 
   // 마커: 규정 P1…, 체인 N1…(depth 순). Critic은 이 집합과 답변 속 마커를 대조한다
   const nodes = chain ? [...chain.nodes].sort((a, b) => a.depth - b.depth || a.id - b.id) : [];
@@ -321,12 +332,14 @@ export async function getMockAnswer(wsId: number, query: string): Promise<MockAn
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let mockSession = 1000;
 
-export async function* mockChatEvents(wsId: number, query: string): AsyncGenerator<ChatEvent> {
+export async function* mockChatEvents(wsId: number, query: string, actor = "배종현"): AsyncGenerator<ChatEvent> {
   const t0 = Date.now();
   const ws = await getWorkspace(wsId);
   const mode: Mode = ws?.policy_enabled ? "policy" : "dag_only";
 
-  yield { event: "session", data: { session_id: ++mockSession } };
+  const sessionId = ++mockSession;
+  yield { event: "session", data: { session_id: sessionId } };
+  let chainEvent: ChainEvent | null = null;
 
   // supervisor — DAG 단일은 분류 생략, 규정 결합은 LLM 분류 1회 흉내
   yield { event: "stage", data: { node: "supervisor", status: "start" } };
@@ -349,17 +362,15 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
     await sleep(250);
     if (a.chain) {
       const ref = new Map(a.chain_refs.map((r) => [r.id, r.ref]));
-      yield {
-        event: "chain",
-        data: {
+      chainEvent = {
           entry_id: a.chain.entry_id,
           edges: a.chain.edges,
           nodes: a.chain.nodes.map((n) => ({
             ref: ref.get(n.id)!, id: n.id, type: n.type, status: n.status, title: n.title,
             depth: n.depth, path_label: n.path_label, last_confirmed_at: n.last_confirmed_at,
           })),
-        },
       };
+      yield { event: "chain", data: chainEvent };
     }
     yield { event: "stage", data: { node: "graph_search", status: "done" } };
   }
@@ -398,6 +409,9 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
     ...a.policy.map((p) => [p.ref, p.chunk_id] as const),
     ...a.chain_refs.map((r) => [r.ref, String(r.id)] as const),
   ]);
+  const latency = { retrieval_ms, first_token_ms, total_ms: Date.now() - t0 };
+  // 검색 내역 저장 (실서버: Python이 시작 시 INSERT, Spring이 done 가로채 UPDATE + answer_text)
+  store.sessions.push({ id: sessionId, workspace_id: wsId, user_name: actor, query, intent, mode, answer_text: text, policy: a.policy, chain: chainEvent, citations: { verified: a.verified, unverified: a.unverified }, latency, score: null, created_at: new Date().toISOString() });
   yield {
     event: "done",
     data: {
@@ -405,10 +419,25 @@ export async function* mockChatEvents(wsId: number, query: string): AsyncGenerat
       retrieved_ids: [...refToId.values()],
       verified_ids: a.verified.map((r) => refToId.get(r)!),
       unverified_ids: a.unverified,
-      latency: { retrieval_ms, first_token_ms, total_ms: Date.now() - t0 },
+      latency,
       model: "mock", prompt_tokens: 0, completion_tokens: Math.ceil(text.length / 2),
     },
   };
+}
+
+// ---- 검색 내역
+export async function getSessions(wsId: number, limit = 30): Promise<SearchSession[]> {
+  await connection();
+  return store.sessions.filter((x) => x.workspace_id === wsId).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
+}
+export async function getSession(wsId: number, id: number): Promise<SearchSession | null> {
+  return store.sessions.find((x) => x.id === id && x.workspace_id === wsId) ?? null;
+}
+export async function setSessionScore(wsId: number, id: number, score: 1 | -1 | null): Promise<SearchSession | null> {
+  const x = store.sessions.find((s) => s.id === id && s.workspace_id === wsId);
+  if (!x) return null;
+  x.score = score;
+  return x;
 }
 
 // 대시보드 요약 — 로그 집계는 저장소 실시간, 탐색 시간·평가는 실측 전 예시값(is_sample)
@@ -436,8 +465,12 @@ export async function getDashboardSummary(wsId: number): Promise<DashboardSummar
       resolved_roots: roots.filter((r) => !!r.resolved_at).length,
       refine_failed: all.filter((l) => l.refine_status === "failed").length,
     },
-    feedback: { up: 0, down: 0 },
-    latency_ms: { retrieval: null, first_token: null, total: null },
+    feedback: { up: store.sessions.filter((x) => x.workspace_id === wsId && x.score === 1).length, down: store.sessions.filter((x) => x.workspace_id === wsId && x.score === -1).length },
+    latency_ms: (() => {
+      const ss = store.sessions.filter((x) => x.workspace_id === wsId);
+      const avg = (f: (x: SearchSession) => number) => (ss.length ? Math.round(ss.reduce((m, x) => m + f(x), 0) / ss.length) : null);
+      return { retrieval: avg((x) => x.latency.retrieval_ms), first_token: avg((x) => x.latency.first_token_ms), total: avg((x) => x.latency.total_ms) };
+    })(),
   };
 }
 

@@ -1,5 +1,5 @@
 // 클라이언트 컴포넌트용. 목업 라우트(app/api/mock) → 3단계에서 NEXT_PUBLIC_API_BASE 로 교체.
-import type { Chain, ChatEvent, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent } from "@/lib/types/domain";
+import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent } from "@/lib/types/domain";
 
 const base = process.env.NEXT_PUBLIC_API_BASE ?? "/api/mock";
 const headers = (wsId: number) => ({ "Content-Type": "application/json", "X-Workspace-Id": String(wsId) });
@@ -117,4 +117,14 @@ export async function fetchDocEvents(wsId: number, documentId?: number): Promise
 export async function fetchLogs(wsId: number): Promise<LogNode[]> {
   const r = await fetch(`${base}/logs?limit=0`, { headers: headers(wsId), cache: "no-store" });
   return r.ok ? r.json() : [];
+}
+
+// 검색 내역
+export async function fetchSessions(wsId: number, limit = 30): Promise<SearchSession[]> {
+  const r = await fetch(`${base}/sessions?limit=${limit}`, { headers: headers(wsId), cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+export async function patchSessionScore(wsId: number, id: number, score: 1 | -1 | null): Promise<boolean> {
+  const r = await fetch(`${base}/sessions/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ score }) });
+  return r.ok;
 }

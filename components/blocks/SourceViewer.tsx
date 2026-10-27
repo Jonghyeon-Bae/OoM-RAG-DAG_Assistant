@@ -4,7 +4,7 @@ import { Chip, cn } from "@/components/ui";
 import type { PolicyRef } from "@/lib/types/domain";
 
 // JSON 근거 카드 (03 안건 A). 청크 텍스트를 ①②③ 항 단위로 쪼개 전부 하이라이트. react-pdf 원문은 Tier 2.
-export function SourceViewer({ sources, activeRef, onSelect }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void }) {
+export function SourceViewer({ sources, activeRef, onSelect, context }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void; context?: { query: string; onBack: () => void } }) {
   const active = sources.find((s) => s.ref === activeRef) ?? sources[0];
   const clauses = active ? active.text.split(/(?=[①②③④⑤⑥⑦⑧⑨])/).map((s) => s.trim()).filter(Boolean) : [];
 
@@ -16,6 +16,12 @@ export function SourceViewer({ sources, activeRef, onSelect }: { sources: Policy
         <Chip tone="primary" className="text-[11px]" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
       </div>
 
+      {context && (
+        <div className="flex items-start gap-2 rounded-lg bg-warn-bg/60 px-3 py-2 text-xs text-ink">
+          <span className="min-w-0 flex-1">이전 질문의 근거: <b className="line-clamp-1">{context.query}</b></span>
+          <button type="button" onClick={context.onBack} className="shrink-0 font-medium text-primary-700 hover:underline">최신으로</button>
+        </div>
+      )}
       {sources.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-ink-muted">답변에 인용된 규정 조항이 여기에 표시됩니다.</div>
       ) : (
