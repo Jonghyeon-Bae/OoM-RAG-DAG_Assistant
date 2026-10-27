@@ -46,6 +46,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         body: String(fd.get("body") ?? "").trim(),
         parent_id: parent === ROOT ? null : Number(parent),
         resolve_root: resolveRoot,
+        problem_title: parent === ROOT && type === "success" ? String(fd.get("problem_title") ?? "").trim() : undefined,
       });
       onCreated?.(node);
       form.reset();
@@ -97,6 +98,11 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         </p>
       </Field>
 
+      {type === "success" && parent === ROOT && (
+        <Field label="어떤 문제였나요?" htmlFor="log-problem" hint="장애 건은 문제(실패)로 시작합니다. 한 줄만 적으면 그 아래에 이 해결 기록이 들어가고 바로 완료 처리됩니다.">
+          <Input id="log-problem" name="problem_title" className="h-11" placeholder="예: 이미지 업로드 시 413 오류" required />
+        </Field>
+      )}
       <Field label="제목" htmlFor="log-title">
         <Input id="log-title" name="title" className="h-11" placeholder={guide[type].title} required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>

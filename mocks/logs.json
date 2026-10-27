@@ -20,7 +20,9 @@
     "last_confirmed_at": "2026-10-09T05:20:00Z",
     "created_at": "2026-10-09T05:20:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": null
   },
   {
     "id": 102,
@@ -42,7 +44,9 @@
     "last_confirmed_at": "2026-10-08T08:05:00Z",
     "created_at": "2026-10-08T08:05:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": null
   },
   {
     "id": 103,
@@ -64,7 +68,9 @@
     "last_confirmed_at": null,
     "created_at": "2026-10-07T02:30:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": null
   },
   {
     "id": 104,
@@ -86,15 +92,17 @@
     "last_confirmed_at": null,
     "created_at": "2026-10-05T00:48:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": null
   },
   {
     "id": 105,
     "workspace_id": 1,
-    "type": "success",
+    "type": "fail",
     "status": "active",
-    "title": "임베딩 배치 재시도 큐 적용",
-    "body": "임베딩 API 429 발생 시 지수 백오프 재시도 큐 도입.",
+    "title": "임베딩 배치 HTTP 429 반복 실패",
+    "body": "야간 임베딩 배치에서 임베딩 API 429(rate limit)가 반복돼 배치가 중단됨.",
     "author_name": "장문경",
     "path_label": "root.batch",
     "error_code": "HTTP 429",
@@ -103,12 +111,14 @@
       "재시도",
       "백오프"
     ],
-    "resolution_summary": "지수 백오프 재시도 큐로 429 흡수",
+    "resolution_summary": "증상: 임베딩 배치 HTTP 429 반복",
     "refine_status": "done",
     "last_confirmed_at": "2026-10-02T07:12:00Z",
     "created_at": "2026-10-02T07:12:00Z",
     "resolved_at": "2026-10-03T01:00:00Z",
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": "지수 백오프 재시도 큐 적용 후 재발 없음 — 별도 성공 로그 미작성(이관 데이터)",
+    "deprecate_reason": null
   },
   {
     "id": 106,
@@ -130,7 +140,9 @@
     "last_confirmed_at": "2026-10-09T05:20:00Z",
     "created_at": "2026-10-06T01:00:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": null
   },
   {
     "id": 107,
@@ -151,7 +163,9 @@
     "last_confirmed_at": null,
     "created_at": "2026-10-06T01:10:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": null
   },
   {
     "id": 108,
@@ -172,7 +186,9 @@
     "last_confirmed_at": "2026-10-09T05:20:00Z",
     "created_at": "2026-10-06T02:00:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": null
   },
   {
     "id": 109,
@@ -193,7 +209,9 @@
     "last_confirmed_at": "2026-09-20T00:00:00Z",
     "created_at": "2026-09-20T00:00:00Z",
     "resolved_at": null,
-    "deprecated_via": null
+    "deprecated_via": null,
+    "resolve_note": null,
+    "deprecate_reason": "배치 주기 조정으로 임시 스크립트 불필요"
   },
   {
     "id": 110,

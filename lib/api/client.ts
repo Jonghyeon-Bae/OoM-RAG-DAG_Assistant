@@ -11,7 +11,7 @@ export async function fetchChain(wsId: number, entryId: number): Promise<Chain |
   return r.json();
 }
 
-export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean }): Promise<LogNode> {
+export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string }): Promise<LogNode> {
   const r = await fetch(`${base}/logs`, { method: "POST", headers: headers(wsId), body: JSON.stringify(input) });
   if (!r.ok) {
     const j = await r.json().catch(() => ({}));
@@ -45,9 +45,12 @@ export async function fetchOrphaned(wsId: number, id: number): Promise<number[]>
   return r.ok ? (await r.json()).orphaned : [];
 }
 
-export async function patchResolved(wsId: number, id: number, resolved: boolean): Promise<LogNode | null> {
-  const r = await fetch(`${base}/logs/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ resolved }) });
-  return r.ok ? r.json() : null;
+// 완료/해제. 성공 로그가 없으면 서버가 NOTE_REQUIRED(409)를 돌려주고 note를 받아 재시도한다
+export async function patchResolved(wsId: number, id: number, resolved: boolean, note?: string): Promise<{ ok: true; node: LogNode } | { ok: false; code?: string; message: string }> {
+  const r = await fetch(`${base}/logs/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ resolved, note }) });
+  if (r.ok) return { ok: true, node: await r.json() };
+  const j = await r.json().catch(() => ({}));
+  return { ok: false, code: j.code, message: j.message ?? `완료 처리 실패 (${r.status})` };
 }
 
 // 채팅 SSE 수신. "event: 이름 / data: JSON" 블록을 \n\n 단위로 파싱해 onEvent 로 넘긴다. Spring 릴레이도 같은 형식.
@@ -107,5 +110,11 @@ export async function fetchDocChunks(wsId: number, id: number): Promise<PolicyCh
 export async function fetchDocEvents(wsId: number, documentId?: number): Promise<DocEvent[]> {
   const q = documentId ? `?document_id=${documentId}` : "";
   const r = await fetch(`${base}/documents/events${q}`, { headers: headers(wsId), cache: "no-store" });
+  return r.ok ? r.json() : [];
+}
+
+// 워크스페이스 전체 로그 (등록 직후 "이어서 적을" 후보 갱신용)
+export async function fetchLogs(wsId: number): Promise<LogNode[]> {
+  const r = await fetch(`${base}/logs?limit=0`, { headers: headers(wsId), cache: "no-store" });
   return r.ok ? r.json() : [];
 }

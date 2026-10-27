@@ -44,7 +44,7 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
   const showEvents = (doc: PolicyDocument | null) => run(doc?.id ?? 0, async () => setPanel({ kind: "events", doc, items: await fetchDocEvents(wsId, doc?.id) }), false);
 
   return (
-    <main className="grid gap-6 p-8 xl:grid-cols-[1fr_380px]">
+    <main className="grid gap-6 p-4 md:p-6 xl:grid-cols-[1fr_380px] xl:p-8">
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex gap-1">
@@ -67,7 +67,7 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
                 <h2 className="font-semibold text-ink">{g[0].title}</h2>
                 <span className="text-xs text-ink-muted">버전 {g.length}개 · 사용 중 {g.filter((d) => d.status === "active").length}</span>
               </div>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm">
                 <thead className="text-left text-xs text-ink-muted">
                   <tr className="[&>th]:px-5 [&>th]:py-2 [&>th]:font-medium">
                     <th>버전</th><th>원천</th><th>상태</th><th className="text-right">청크</th><th>인덱싱 · 등록자</th><th className="text-right">작업</th>
@@ -109,7 +109,7 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
                             <td colSpan={6} className="px-5 py-3">
                               {asking.kind === "retire" ? (
                                 <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => { e.preventDefault(); if (asking.reason.trim()) retire(d.id, asking.reason.trim()); }}>
-                                  <span className="text-sm">폐기하면 어시스턴트 검색에서 제외됩니다. 사유:</span>
+                                  <span className="text-sm">{g.filter((x) => x.status === "active").length === 1 ? <b className="text-fail">이 규정의 마지막 사용 중 버전입니다 — 폐기하면 이 규정 전체가 검색에서 빠집니다.</b> : "폐기하면 어시스턴트 검색에서 제외됩니다."} 사유:</span>
                                   <input autoFocus value={asking.reason} onChange={(e) => setAsk({ ...asking, reason: e.target.value })} placeholder="예: v2.2 개정" className="h-8 min-w-56 rounded-md border bg-white px-2 text-sm" />
                                   <Button size="xs" type="submit" disabled={!asking.reason.trim() || busy === d.id}>폐기</Button>
                                   <Button size="xs" type="button" variant="ghost" onClick={() => setAsk(null)}>취소</Button>
@@ -128,7 +128,7 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
                     );
                   })}
                 </tbody>
-              </table>
+              </table></div>
             </Card>
           );
         })}
@@ -136,7 +136,7 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
       </section>
 
       <aside>
-        <Card className="sticky top-6 gap-3 p-5">
+        <Card className="gap-3 p-5 xl:sticky xl:top-24">
           {panel.kind === "chunks" ? (
             <>
               <div className="flex items-center justify-between">

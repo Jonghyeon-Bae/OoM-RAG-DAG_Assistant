@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteDocument, setDocumentStatus } from "@/lib/api";
+import { actorFromRequest } from "@/lib/api/session";
 
 const ws = (req: NextRequest) => Number(req.headers.get("x-workspace-id") ?? 1);
-// 실서버는 세션(JWT)에서 actor를 얻는다. 목업은 헤더 대체
-const actor = (req: NextRequest) => req.headers.get("x-actor") ?? "배종현";
+// 실서버는 세션(JWT)에서 actor를 얻는다. 목업은 데모 쿠키
+const actor = (req: NextRequest) => actorFromRequest(req).name;
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
