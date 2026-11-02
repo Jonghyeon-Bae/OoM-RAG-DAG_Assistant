@@ -90,6 +90,8 @@ const stageLabel: { node: StageNode; label: string; hint: string }[] = [
   { node: "critic", label: "출처 검증", hint: "답변 속 번호가 실제 근거와 맞는지 대조합니다" },
 ];
 const intentLabel: Record<Intent, string> = { policy: "규정 확인", troubleshoot: "장애 해결", both: "규정 + 해결 사례" };
+// 실서버 stage detail 코드 → 표시 문구 (근거 없음은 gate 의 detail "no_evidence")
+const detailLabel: Record<string, string> = { no_evidence: "근거 없음" };
 // B-11 추천 질문: 워크스페이스 모드별 정적 3개. 실서버 전환 후에도 정적 유지(검색 내역 기반 추천은 R-목록)
 const suggestions = (policy: boolean): string[] =>
   policy
@@ -310,7 +312,7 @@ function PipelineBadges({ turn }: { turn: Turn }) {
             {i > 0 && <ArrowRight className="size-3.5 text-ink-muted" />}
             <Chip title={hint} tone={st?.status === "error" ? "fail" : st?.status === "done" ? "primary" : st?.status === "start" ? "warn" : "neutral"} className={cn(!st && "opacity-40")}>
               {st?.status === "start" && <Loader2 className="mr-1 size-3 animate-spin" />}
-              {label}{st?.detail ? ` · ${st.detail}` : ""}
+              {label}{st?.detail ? ` · ${detailLabel[st.detail] ?? st.detail}` : ""}
             </Chip>
           </span>
         );

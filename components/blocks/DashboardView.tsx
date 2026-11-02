@@ -21,7 +21,7 @@ function Kpi({ label, value, sub, subTone = "neutral", sample = false }: { label
 }
 
 // B-51: 유형별 탐색 시간 before/after 막대 (CSS). 축은 공통 최대값 기준.
-function CompareBars({ rows }: { rows: DashboardSummary["search_time"]["by_intent"] }) {
+function CompareBars({ rows }: { rows: NonNullable<DashboardSummary["search_time"]>["by_intent"] }) {
   const max = Math.max(...rows.flatMap((r) => [r.before_min, r.after_min]), 1);
   const w = (v: number) => `${Math.max(2, (v / max) * 100)}%`;
   return (
@@ -47,13 +47,15 @@ function CompareBars({ rows }: { rows: DashboardSummary["search_time"]["by_inten
 
 export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSummary }) {
   const { search_time: st, eval: ev, logs, queries, no_evidence: noEv, resolve_time: rt, reused } = data;
-  const reduce = Math.round((1 - st.after_min / st.before_min) * 100);
+  // 탐색 시간은 실측(E6) 전 null 로 온다 → "—"
+  const hasSt = !!st && st.before_min != null && st.after_min != null;
+  const reduce = hasSt ? Math.round((1 - st.after_min / st.before_min) * 100) : null;
   const fmt = (v: number | null) => (v == null ? "—" : v.toFixed(2));
   return (
     <main className="flex flex-col gap-6 p-4 md:p-6 xl:p-8">
       {/* B-50 KPI */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Kpi label="평균 정보 탐색 시간" value={<>{st.before_min}<span className="mx-1 text-ink-muted">→</span>{st.after_min}분</>} sub={`-${reduce}% 단축`} subTone="primary" sample={data.is_sample} />
+        <Kpi label="평균 정보 탐색 시간" value={hasSt ? <>{st.before_min}<span className="mx-1 text-ink-muted">→</span>{st.after_min}분</> : "—"} sub={reduce === null ? "측정 전" : `-${reduce}% 단축`} subTone="primary" sample={data.is_sample} />
         <Kpi label="Faithfulness" value={fmt(ev.faithfulness)} sub="답변이 근거에 충실한 정도" sample={data.is_sample} />
         <Kpi label="Answer Relevance" value={fmt(ev.answer_relevance)} sub="질문에 맞는 답인지" sample={data.is_sample} />
         <Kpi label="등록된 업무 로그" value={`${logs.total}건`} sub={`이번 주 +${logs.week}`} subTone="primary" />
@@ -132,7 +134,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
               <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-primary-700" /> AI Assistant</span>
             </div>
           </div>
-          <CompareBars rows={st.by_intent} />
+          {hasSt && st.by_intent?.length ? <CompareBars rows={st.by_intent} /> : <p className="text-sm text-ink-muted">측정 전입니다. E6 탐색 시간 실험 후 표시됩니다.</p>}
           {data.is_sample && <p className="mt-6 text-xs text-ink-muted">※ 예시 데이터입니다. 측정 방법: 4명이 같은 과제 10건을 기존 검색과 AI Assistant로 각각 수행해 과제 시작~정답 확인 시간을 비교(E6, 팀 내부 파일럿). 실측 후 교체됩니다.</p>}
         </Card>
 
