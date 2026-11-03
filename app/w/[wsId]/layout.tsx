@@ -1,11 +1,6 @@
 import { notFound } from "next/navigation";
-import { getWorkspace, getWorkspaces } from "@/lib/api";
+import { getWorkspace } from "@/lib/api";
 import { Sidebar } from "@/components/shell/Sidebar";
-
-export async function generateStaticParams() {
-  const ws = await getWorkspaces();
-  return ws.map((w) => ({ wsId: String(w.id) }));
-}
 
 export default async function WorkspaceLayout({
   children,

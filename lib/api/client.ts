@@ -1,66 +1,137 @@
-// 클라이언트 컴포넌트용. 목업 라우트(app/api/mock) → 3단계에서 NEXT_PUBLIC_API_BASE 로 교체.
+// 클라이언트 컴포넌트용. 브라우저 → /api/v1 (next.config rewrites → Spring :8080).
+// 일반 요청은 axios, 채팅 SSE 만 fetch (axios 는 브라우저에서 스트림을 조각으로 못 받는다).
+import axios from "axios";
 import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent } from "@/lib/types/domain";
 
-const base = process.env.NEXT_PUBLIC_API_BASE ?? "/api/mock";
-const headers = (wsId: number) => ({ "Content-Type": "application/json", "X-Workspace-Id": String(wsId) });
+const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
+// 공통 설정: 주소·JSON 헤더·쿠키 전송을 여기서 한 번만
+const api = axios.create({
+  baseURL: BASE,
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
+});
+
+// 401(로그인 없음·만료) → 첫 화면으로. 로그인 요청 자체의 401 은 제외(무한 이동 방지)
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (axios.isAxiosError(err) && err.response?.status === 401 && err.config?.url !== "/auth/login" && typeof window !== "undefined") {
+      window.location.assign("/");
+    }
+    return Promise.reject(err);
+  },
+);
+
+// Spring 이 이 헤더로 워크스페이스 소속을 확인한다 (TenantContextFilter)
+const ws = (wsId: number) => ({ headers: { "X-Workspace-Id": String(wsId) } });
+
+// Spring 에러 응답 {code, message} 와 상태 코드 꺼내기
+const errBody = (e: unknown) => (axios.isAxiosError(e) ? (e.response?.data as { code?: string; message?: string } | undefined) : undefined);
+const httpStatus = (e: unknown) => (axios.isAxiosError(e) ? e.response?.status : undefined);
+
+// ── 로그·체인 ────────────────────────────────────────────────────────────────
 export async function fetchChain(wsId: number, entryId: number): Promise<Chain | null> {
-  const r = await fetch(`${base}/chains/${entryId}`, { headers: headers(wsId) });
-  if (r.status === 404) return null;
-  if (!r.ok) throw new Error(`chain ${r.status}`);
-  return r.json();
+  try {
+    const { data } = await api.get<Chain>(`/chains/${entryId}`, ws(wsId));
+    return data;
+  } catch (e) {
+    if (httpStatus(e) === 404) return null;
+    throw e;
+  }
 }
 
 export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string }): Promise<LogNode> {
-  const r = await fetch(`${base}/logs`, { method: "POST", headers: headers(wsId), body: JSON.stringify(input) });
-  if (!r.ok) {
-    const j = await r.json().catch(() => ({}));
-    throw new Error(j.message ?? `등록 실패 (${r.status})`);
+  try {
+    const { data } = await api.post<LogNode>("/logs", input, ws(wsId));
+    return data;
+  } catch (e) {
+    throw new Error(errBody(e)?.message ?? `등록 실패 (${httpStatus(e)})`);
   }
-  return r.json();
 }
 
 export async function fetchLog(wsId: number, id: number): Promise<LogNode | null> {
-  const r = await fetch(`${base}/logs/${id}`, { headers: headers(wsId), cache: "no-store" });
-  return r.ok ? r.json() : null;
+  try {
+    const { data } = await api.get<LogNode>(`/logs/${id}`, ws(wsId));
+    return data;
+  } catch {
+    return null;
+  }
 }
 
+// 응답 형태 차이 ①: 목업은 배열, 실서버는 {items, counts}
 export async function fetchRecentLogs(wsId: number, limit = 8): Promise<LogNode[]> {
-  const r = await fetch(`${base}/logs?limit=${limit}`, { headers: headers(wsId), cache: "no-store" });
-  return r.ok ? r.json() : [];
+  try {
+    const { data } = await api.get<{ items: LogNode[] }>("/logs", { ...ws(wsId), params: { limit } });
+    return data.items;
+  } catch {
+    return [];
+  }
+}
+
+// 워크스페이스 전체 로그 (등록 직후 "이어서 적을" 후보 갱신용). limit=0 = 전체
+export async function fetchLogs(wsId: number): Promise<LogNode[]> {
+  try {
+    const { data } = await api.get<{ items: LogNode[] }>("/logs", { ...ws(wsId), params: { limit: 0 } });
+    return data.items;
+  } catch {
+    return [];
+  }
 }
 
 export async function postRefine(wsId: number, id: number): Promise<LogNode | null> {
-  const r = await fetch(`${base}/logs/${id}/refine`, { method: "POST", headers: headers(wsId) });
-  return r.ok ? r.json() : null;
+  try {
+    const { data } = await api.post<LogNode>(`/logs/${id}/refine`, null, ws(wsId));
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export async function patchStatus(wsId: number, id: number, status: "active" | "deprecated", reason?: string, cascade = false): Promise<(LogNode & { affected: number[] }) | null> {
-  const r = await fetch(`${base}/logs/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ status, reason, cascade }) });
-  return r.ok ? r.json() : null;
+  try {
+    const { data } = await api.patch<LogNode & { affected: number[] }>(`/logs/${id}`, { status, reason, cascade }, ws(wsId));
+    return data;
+  } catch {
+    return null;
+  }
 }
 
+// 응답 형태 차이 ②: 목업 OPTIONS → 실서버 GET /logs/{id}/orphaned
 export async function fetchOrphaned(wsId: number, id: number): Promise<number[]> {
-  const r = await fetch(`${base}/logs/${id}`, { method: "OPTIONS", headers: headers(wsId) });
-  return r.ok ? (await r.json()).orphaned : [];
+  try {
+    const { data } = await api.get<{ orphaned: number[] }>(`/logs/${id}/orphaned`, ws(wsId));
+    return data.orphaned;
+  } catch {
+    return [];
+  }
 }
 
-// 완료/해제. 성공 로그가 없으면 서버가 NOTE_REQUIRED(409)를 돌려주고 note를 받아 재시도한다
+// 완료/해제. 성공 로그가 없으면 서버가 409 NOTE_REQUIRED 를 주고, note 를 받아 다시 보낸다
 export async function patchResolved(wsId: number, id: number, resolved: boolean, note?: string): Promise<{ ok: true; node: LogNode } | { ok: false; code?: string; message: string }> {
-  const r = await fetch(`${base}/logs/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ resolved, note }) });
-  if (r.ok) return { ok: true, node: await r.json() };
-  const j = await r.json().catch(() => ({}));
-  return { ok: false, code: j.code, message: j.message ?? `완료 처리 실패 (${r.status})` };
+  try {
+    const { data } = await api.patch<LogNode>(`/logs/${id}`, { resolved, note }, ws(wsId));
+    return { ok: true, node: data };
+  } catch (e) {
+    const b = errBody(e);
+    return { ok: false, code: b?.code, message: b?.message ?? `완료 처리 실패 (${httpStatus(e)})` };
+  }
 }
 
-// 채팅 SSE 수신. "event: 이름 / data: JSON" 블록을 \n\n 단위로 파싱해 onEvent 로 넘긴다. Spring 릴레이도 같은 형식.
+// ── 어시스턴트 ───────────────────────────────────────────────────────────────
+// 채팅 SSE 수신 — fetch 유지. "event: 이름 / data: JSON" 블록을 \n\n 단위로 파싱해 onEvent 로 넘긴다
 export async function streamChat(wsId: number, query: string, onEvent: (e: ChatEvent) => void, signal?: AbortSignal): Promise<void> {
-  const r = await fetch(`${base}/chat`, {
+  const r = await fetch(`${BASE}/chat`, {
     method: "POST",
-    headers: { ...headers(wsId), Accept: "text/event-stream" },
+    credentials: "include",
+    headers: { "Content-Type": "application/json", "X-Workspace-Id": String(wsId), Accept: "text/event-stream" },
     body: JSON.stringify({ query }),
     signal,
   });
+  if (r.status === 401) {
+    window.location.assign("/");
+    return;
+  }
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
 
   const reader = r.body.getReader();
@@ -90,41 +161,59 @@ export async function streamChat(wsId: number, query: string, onEvent: (e: ChatE
   }
 }
 
+// 검색 내역
+export async function fetchSessions(wsId: number, limit = 30): Promise<SearchSession[]> {
+  try {
+    const { data } = await api.get<SearchSession[]>("/sessions", { ...ws(wsId), params: { limit } });
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+// 응답 형태 차이 ③: 목업 PATCH /sessions/{id} → 실서버 POST /feedback (score null = 철회). 204
+export async function patchSessionScore(wsId: number, id: number, score: 1 | -1 | null): Promise<boolean> {
+  try {
+    await api.post("/feedback", { session_id: id, score }, ws(wsId));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── 규정 문서 — 백엔드 API 는 게이트(11/06) 뒤. 메뉴 비활성 상태라 지금은 호출되지 않는다 ──
 export async function patchDocStatus(wsId: number, id: number, status: DocStatus, reason?: string): Promise<PolicyDocument | null> {
-  const r = await fetch(`${base}/documents/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ status, reason }) });
-  return r.ok ? r.json() : null;
+  try {
+    const { data } = await api.patch<PolicyDocument>(`/documents/${id}`, { status, reason }, ws(wsId));
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteDoc(wsId: number, id: number): Promise<{ ok: boolean; message?: string }> {
-  const r = await fetch(`${base}/documents/${id}`, { method: "DELETE", headers: headers(wsId) });
-  if (r.ok) return { ok: true };
-  const j = await r.json().catch(() => ({}));
-  return { ok: false, message: j.message };
+  try {
+    await api.delete(`/documents/${id}`, ws(wsId));
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, message: errBody(e)?.message };
+  }
 }
 
 export async function fetchDocChunks(wsId: number, id: number): Promise<PolicyChunk[]> {
-  const r = await fetch(`${base}/documents/${id}/chunks`, { headers: headers(wsId), cache: "no-store" });
-  return r.ok ? r.json() : [];
+  try {
+    const { data } = await api.get<PolicyChunk[]>(`/documents/${id}/chunks`, ws(wsId));
+    return data;
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchDocEvents(wsId: number, documentId?: number): Promise<DocEvent[]> {
-  const q = documentId ? `?document_id=${documentId}` : "";
-  const r = await fetch(`${base}/documents/events${q}`, { headers: headers(wsId), cache: "no-store" });
-  return r.ok ? r.json() : [];
-}
-
-// 워크스페이스 전체 로그 (등록 직후 "이어서 적을" 후보 갱신용)
-export async function fetchLogs(wsId: number): Promise<LogNode[]> {
-  const r = await fetch(`${base}/logs?limit=0`, { headers: headers(wsId), cache: "no-store" });
-  return r.ok ? r.json() : [];
-}
-
-// 검색 내역
-export async function fetchSessions(wsId: number, limit = 30): Promise<SearchSession[]> {
-  const r = await fetch(`${base}/sessions?limit=${limit}`, { headers: headers(wsId), cache: "no-store" });
-  return r.ok ? r.json() : [];
-}
-export async function patchSessionScore(wsId: number, id: number, score: 1 | -1 | null): Promise<boolean> {
-  const r = await fetch(`${base}/sessions/${id}`, { method: "PATCH", headers: headers(wsId), body: JSON.stringify({ score }) });
-  return r.ok;
+  try {
+    const { data } = await api.get<DocEvent[]>("/documents/events", { ...ws(wsId), params: documentId ? { document_id: documentId } : undefined });
+    return data;
+  } catch {
+    return [];
+  }
 }

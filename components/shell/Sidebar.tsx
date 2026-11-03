@@ -8,7 +8,7 @@ const nav = [
   { href: "timeline", label: "트러블슈팅 타임라인" },
   { href: "logs/new", label: "업무로그 등록" },
   { href: "dashboard", label: "성과 대시보드" },
-  { href: "documents", label: "규정 문서 관리", policyOnly: true },
+  { href: "documents", label: "규정 문서 관리", policyOnly: true, pending: true }, // API 게이트(11/06) 뒤
 ];
 
 export function Sidebar({ wsId, policyEnabled }: { wsId: number; policyEnabled: boolean }) {
@@ -23,7 +23,7 @@ export function Sidebar({ wsId, policyEnabled }: { wsId: number; policyEnabled: 
         {nav.map((item) => {
           const href = `/w/${wsId}/${item.href}`;
           const active = pathname.startsWith(href);
-          const disabled = item.policyOnly && !policyEnabled;
+          const disabled = item.pending || (item.policyOnly && !policyEnabled);
           return (
             <Link
               key={item.href}
