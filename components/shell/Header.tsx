@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Chip, Avatar } from "@/components/ui";
 import { getCurrentUser } from "@/lib/api/session";
+import { UserMenu } from "@/components/shell/UserMenu";
 import type { Workspace } from "@/lib/types/domain";
 
 export function Header({
@@ -24,14 +25,14 @@ export function Header({
         <Chip tone="primary" className="hidden sm:inline-flex">{ws.name}</Chip>
         <Chip tone={ws.policy_enabled ? "primary" : "neutral"} className="hidden lg:inline-flex">{ws.policy_enabled ? "규정 + 해결 사례" : "해결 사례만"}</Chip>
         {right}
-        <Suspense fallback={<Avatar name="·" />}><UserAvatar /></Suspense>
+        <Suspense fallback={<Avatar name="·" />}><UserAvatar wsId={ws.id} /></Suspense>
       </div>
     </header>
   );
 }
 
-// 쿠키(데모 세션) 기반 — 동적이므로 Suspense 안에서만 렌더
-async function UserAvatar() {
+// 세션 쿠키 기반(GET /me) — 동적이므로 Suspense 안에서만 렌더. 전환·로그아웃 메뉴는 클라이언트
+async function UserAvatar({ wsId }: { wsId: number }) {
   const u = await getCurrentUser();
-  return <Avatar name={u.name} title={`${u.name} ${u.title}`} />;
+  return <UserMenu me={u} wsId={wsId} />;
 }

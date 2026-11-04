@@ -1,7 +1,7 @@
 // 데이터 접근 단일 지점 (서버 컴포넌트용). Spring /api/v1 을 호출한다. 목업 store·mocks 의존 없음.
 // 함수 이름·반환 모양은 목업 때와 같게 유지 → page.tsx 는 고치지 않는다
 import { connection } from "next/server";
-import type { Workspace, User, LogNode, LogCounts, Chain, DashboardSummary, PolicyDocument, DocEvent } from "@/lib/types/domain";
+import type { Workspace, LogNode, LogCounts, Chain, DashboardSummary, PolicyDocument, DocEvent } from "@/lib/types/domain";
 import { serverGet, serverGetOrNull } from "@/lib/api/server";
 
 // 워크스페이스 — 로그인 상태면 내가 소속된 곳, 로그인 전이면 부서 목록 (GET /workspaces 는 로그인 없이 열림)
@@ -12,11 +12,6 @@ export async function getWorkspace(id: number): Promise<Workspace | undefined> {
   return (await getWorkspaces()).find((w) => w.id === id);
 }
 
-// 첫 화면(app/page.tsx)의 사용자 목록 — Spring GET /users 는 관리자 전용이라 로그인 전엔 받을 수 없다.
-// 로그인 방식(JWT/OAuth2) 확정 전까지 빈 목록 (BE-CHECK-001 S8)
-export async function getUsers(): Promise<User[]> {
-  return [];
-}
 
 // 로그 — counts 는 active 만 센다(서버 규칙)
 export async function getLogs(wsId: number): Promise<{ items: LogNode[]; counts: LogCounts }> {
