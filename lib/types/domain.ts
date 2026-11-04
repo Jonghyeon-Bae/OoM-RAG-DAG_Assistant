@@ -120,7 +120,7 @@ export interface DashboardSummary {
     before_min: number;
     after_min: number;
     by_intent: { intent: Intent; before_min: number; after_min: number }[];
-  };
+  } | null;
   eval: { faithfulness: number | null; answer_relevance: number | null; dataset_version: string | null; run_at: string | null };
   logs: { total: number; week: number; open_roots: number; resolved_roots: number; refine_failed: number };
   feedback: { up: number; down: number };
@@ -173,4 +173,18 @@ export interface PolicyChunk {
   article_label: string;
   page: number | null;
   text: string;
+}
+
+// GET /me 응답 (AuthController.Me). 로그인 사용자
+export interface Me {
+  id: number;
+  employee_no: string;
+  name: string;
+  title: string | null;
+  email: string | null;
+  workspace_id: number | null;
+  workspaces: { id: number; name: string; policy_enabled: boolean; role: string }[];
+  must_change_password: boolean;
+  consent_required: boolean;
+  password_expires_at: string | null;
 }
