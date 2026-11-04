@@ -84,6 +84,7 @@ export interface DoneEvent {
   intent: Intent; retrieved_ids: string[]; verified_ids: string[]; unverified_ids: string[];
   latency: { retrieval_ms: number; first_token_ms: number; total_ms: number };
   model: string; prompt_tokens: number; completion_tokens: number;
+  truncated?: boolean; // 토큰 한도로 답이 잘렸을 때(백엔드 sse_events.schema)
 }
 
 export type ChatEvent =
@@ -102,6 +103,7 @@ export interface SearchSession {
   id: number;
   workspace_id: number;
   user_name: string;
+  status: "streaming" | "done" | "error"; // 서버 세션 상태(연동확인표 ✏️)
   query: string;
   intent: Intent;
   mode: Mode;

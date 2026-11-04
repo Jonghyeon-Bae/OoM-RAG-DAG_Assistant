@@ -111,14 +111,15 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
     setBusyId(id);
     setAsk(null);
     const r = await patchStatus(wsId, id, status, reason, cascade);
-    if (r) {
-      const { affected, ...n } = r;
-      patchInto(n);
-      if (affected.length) {
-        const fresh = await Promise.all(affected.map((a) => fetchLog(wsId, a)));
+    if (r.ok) {
+      patchInto(r.node);
+      if (r.affected.length) {
+        const fresh = await Promise.all(r.affected.map((a) => fetchLog(wsId, a)));
         fresh.forEach((f) => f && patchInto(f));
       }
-      setFlash(status === "deprecated" ? `${1 + affected.length}건 폐기됨 — 검색에서 제외됩니다. 각 로그의 "복원"으로 되돌릴 수 있습니다` : `${1 + affected.length}건 복원됨`);
+      setFlash(status === "deprecated" ? `${1 + r.affected.length}건 폐기됨 — 검색에서 제외됩니다. 각 로그의 "복원"으로 되돌릴 수 있습니다` : `${1 + r.affected.length}건 복원됨`);
+    } else {
+      setFlash(r.message); // 서버가 거절한 이유를 그대로 보여준다
     }
     setBusyId(null);
   };

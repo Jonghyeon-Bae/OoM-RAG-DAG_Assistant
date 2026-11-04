@@ -74,10 +74,20 @@ function reducer(s: ChatState, a: Action): ChatState {
 
 // 검색 내역(서버 저장분) → 화면 턴. 재검색 없이 저장된 답을 그대로 보여준다
 const turnFromSession = (x: SearchSession): Turn => ({
-  status: "done", query: x.query, askedAt: x.created_at, sessionId: x.id, stages: {}, intent: x.intent, mode: x.mode,
-  policy: x.policy, chain: x.chain, text: x.answer_text, citations: x.citations,
-  done: { intent: x.intent, retrieved_ids: [], verified_ids: [], unverified_ids: [], latency: x.latency, model: "", prompt_tokens: 0, completion_tokens: 0 },
-  error: null, vote: x.score, fromHistory: true,
+  status: x.status === "done" ? "done" : "error", 
+  query: x.query, 
+  askedAt: x.created_at, 
+  sessionId: x.id, stages: {}, 
+  intent: x.intent, 
+  mode: x.mode,
+  policy: x.policy, 
+  chain: x.chain, 
+  text: x.answer_text, 
+  citations: x.citations,
+  done: x.status === "done" ? { intent: x.intent, retrieved_ids: [], verified_ids: [], unverified_ids: [], 
+  latency: x.latency, model: "", prompt_tokens: 0, completion_tokens: 0 } : null,
+  error: x.status === "streaming" ? "답변이 끝나기 전에 중단된 질문입니다. 다시 물어보면 새로 답합니다" : x.status === "error" ? "답변 중 오류가 난 질문입니다" : null,
+  vote: x.score, fromHistory: true,
 });
 
 // ── 화면 라벨 (사용자 언어 — UX-001) ─────────────────────────────────────────
@@ -286,7 +296,8 @@ function HistoryPanel({ history, onPick, onClose }: { history: { items: SearchSe
                 <span className="w-24 shrink-0 text-[11px] tabular-nums text-ink-muted">{new Date(x.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                 <span className="min-w-0 flex-1 truncate text-ink">{x.query}</span>
                 <Chip className="h-5 shrink-0 text-[11px]">{intentLabel[x.intent]}</Chip>
-                <span className="w-14 shrink-0 text-right text-[11px] text-ink-muted">근거 {x.citations.verified.length}</span>
+                {x.status !== "done" && <Chip tone={x.status === "error" ? "fail" : "warn"} className="h-5 shrink-0 text-[11px]">{x.status === "error" ? "중단됨" : "진행 중"}</Chip>}
+                <span className="w-14 shrink-0 text-right text-[11px] text-ink-muted">근거 {x.citations?.verified.length ?? 0}</span>
                 <span className="w-5 shrink-0 text-center text-[11px]">{x.score === 1 ? "👍" : x.score === -1 ? "👎" : ""}</span>
                 <span className="hidden w-12 shrink-0 text-right text-[11px] text-ink-muted sm:block">{x.user_name}</span>
               </button>

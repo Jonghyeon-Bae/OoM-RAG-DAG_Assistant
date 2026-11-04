@@ -29,6 +29,22 @@ const ws = (wsId: number) => ({ headers: { "X-Workspace-Id": String(wsId) } });
 // Spring 에러 응답 {code, message} 와 상태 코드 꺼내기
 const errBody = (e: unknown) => (axios.isAxiosError(e) ? (e.response?.data as { code?: string; message?: string } | undefined) : undefined);
 const httpStatus = (e: unknown) => (axios.isAxiosError(e) ? e.response?.status : undefined);
+// 서버 업무 코드({code}) → 사용자 문구. 없으면 서버 message, 그것도 없으면 상태 코드 포함 일반 문구
+const codeText: Record<string, string> = {
+  REASON_REQUIRED: "폐기 사유를 입력해 주세요",
+  INVALID_STATUS: "지금 상태에서는 할 수 없는 변경입니다. 화면을 새로 고쳐 주세요",
+  PARENT_DEPRECATED: "이어 붙일 상위 로그가 폐기되어 있습니다. 먼저 복원해 주세요",
+  PARENT_NOT_FOUND: "상위 로그를 찾을 수 없습니다",
+  NOTE_REQUIRED: "이어진 성공 로그가 없어 완료 사유가 필요합니다",
+  NOT_ROOT: "시작 로그에서만 할 수 있습니다",
+  REF_ROOT: "참고 자료는 완료 처리 대상이 아닙니다",
+  PROBLEM_TITLE_REQUIRED: "어떤 문제를 해결했는지 제목을 적어 주세요",
+};
+export type ApiFail = { ok: false; code?: string; message: string };
+const fail = (e: unknown, what: string): ApiFail => {
+  const b = errBody(e);
+  return { ok: false, code: b?.code, message: (b?.code && codeText[b.code]) ?? b?.message ?? `${what} 실패 (${httpStatus(e) ?? "네트워크"})` };
+};
 
 // ── 로그·체인 ────────────────────────────────────────────────────────────────
 export async function fetchChain(wsId: number, entryId: number): Promise<Chain | null> {
@@ -88,12 +104,14 @@ export async function postRefine(wsId: number, id: number): Promise<LogNode | nu
   }
 }
 
-export async function patchStatus(wsId: number, id: number, status: "active" | "deprecated", reason?: string, cascade = false): Promise<(LogNode & { affected: number[] }) | null> {
+// 실패를 null로 삼키지 않는다 — 400 REASON_REQUIRED 등은 화면이 문구로 보여줘야 할 재료(CR-001 §4-2)
+export async function patchStatus(wsId: number, id: number, status: "active" | "deprecated", reason?: string, cascade = false): Promise<{ ok: true; node: LogNode; affected: number[] } | ApiFail> {
   try {
     const { data } = await api.patch<LogNode & { affected: number[] }>(`/logs/${id}`, { status, reason, cascade }, ws(wsId));
-    return data;
-  } catch {
-    return null;
+    const { affected, ...node } = data;
+    return { ok: true, node, affected: affected ?? [] };
+  } catch (e) {
+    return fail(e, status === "deprecated" ? "폐기" : "복원");
   }
 }
 
@@ -113,8 +131,7 @@ export async function patchResolved(wsId: number, id: number, resolved: boolean,
     const { data } = await api.patch<LogNode>(`/logs/${id}`, { resolved, note }, ws(wsId));
     return { ok: true, node: data };
   } catch (e) {
-    const b = errBody(e);
-    return { ok: false, code: b?.code, message: b?.message ?? `완료 처리 실패 (${httpStatus(e)})` };
+    return fail(e, "완료 처리");
   }
 }
 

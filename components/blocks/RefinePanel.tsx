@@ -84,9 +84,12 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
     };
   }, [wsId, currentId]);
 
+  const [notice, setNotice] = useState<string | null>(null); // 서버가 거절한 이유(폐기 사유 없음 등)
   const act = async (id: number, fn: () => Promise<unknown>) => {
     setBusyId(id);
-    await fn();
+    setNotice(null);
+    const res = await fn();
+    if (res && typeof res === "object" && "ok" in res && res.ok === false && "message" in res) setNotice(String(res.message));
     const r = await fetchRecentLogs(wsId, 8);
     setRecent(r);
     if (current?.id === id) setCurrent(r.find((x) => x.id === id) ?? current);
@@ -125,6 +128,7 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
               <Stepper status={current.refine_status} />
             </div>
             <Result n={current} />
+            {notice && <p role="status" className="mt-3 rounded-md bg-warn-bg px-3 py-2 text-xs text-warn">{notice}</p>}
             {current.refine_status === "done" && (
               <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
                 <Link href={`/w/${wsId}/timeline?entry=${current.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-700 px-3 text-sm font-semibold text-white hover:bg-[#27507a]">
