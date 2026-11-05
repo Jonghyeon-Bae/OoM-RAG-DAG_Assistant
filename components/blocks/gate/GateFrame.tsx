@@ -17,14 +17,14 @@ export function GateFrame({ gate, children }: { gate: GateKind; children: (m: Me
     let alive = true;
     me().then((x) => {
       if (!alive) return;
-      if (!x) { router.replace("/"); return; }
+      if (!x) { router.replace("/login"); return; }
       if (!NEED[gate](x)) { router.replace(nextPathFor(x)); return; }
       setM(x);
     });
     return () => { alive = false; };
   }, [router, gate]);
   if (!m) return <p className="text-sm text-ink-muted">확인 중…</p>;
-  const done = async () => { const x = await me(); router.replace(x ? nextPathFor(x) : "/"); };
+  const done = async () => { const x = await me(); router.replace(x ? nextPathFor(x) : "/login"); };
   return (
     <div className="flex flex-col gap-5">
       {children(m, done)}

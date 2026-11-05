@@ -354,7 +354,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
             <Card className="items-center gap-3 p-8 text-center">
               <p className="font-semibold text-ink">아직 등록된 장애 건이 없습니다</p>
               <p className="text-sm text-ink-muted">겪은 문제를 짧게 적어 두면, 다음 사람이 같은 문제를 만났을 때 여기서 해결 흐름을 봅니다.</p>
-              <Link href={`/w/${wsId}/logs/new`} className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary-700 px-4 text-sm font-semibold text-white hover:bg-[#27507a]"><Plus className="size-4" /> 첫 로그 등록</Link>
+              <Link href={`/w/${wsId}/logs/new`} className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary-700 px-4 text-sm font-semibold text-white hover:bg-primary-800"><Plus className="size-4" /> 첫 로그 등록</Link>
             </Card>
           ) : groups.length === 0 ? (
             <div className="py-10 text-center text-sm text-ink-muted">조건에 맞는 장애 건이 없습니다.</div>

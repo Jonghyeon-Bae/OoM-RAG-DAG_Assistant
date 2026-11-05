@@ -47,7 +47,7 @@ export function PasswordForm() {
             {errors.length > 0 && (
               <ul role="alert" className="list-disc rounded-md bg-fail-bg px-3 py-2 pl-7 text-sm text-fail">{errors.map((x) => <li key={x}>{x}</li>)}</ul>
             )}
-            <Button type="submit" size="lg" className="h-11 w-full bg-primary-700 text-white hover:bg-[#27507a]" disabled={busy || mismatch || !current || !next || !confirm}>
+            <Button type="submit" size="lg" className="h-11 w-full bg-primary-700 text-white hover:bg-primary-800" disabled={busy || mismatch || !current || !next || !confirm}>
               {busy && <Loader2 className="size-4 animate-spin" />} 변경하고 계속
             </Button>
           </form>

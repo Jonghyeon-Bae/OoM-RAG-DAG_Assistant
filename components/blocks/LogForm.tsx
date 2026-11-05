@@ -18,9 +18,9 @@ const guide: Record<LogType, { title: string; body: string }> = {
 
 // 유형별 버튼 색: 성공 파랑 / 실패 빨강 / 참고 회색. 선택 시 채움, 미선택 시 옅은 바탕.
 const toneBtn: Record<LogType, { on: string; off: string }> = {
-  success: { on: "border-success bg-success text-white", off: "border-success-bg bg-success-bg text-success hover:bg-[#c9def5]" },
-  fail: { on: "border-fail bg-fail text-white", off: "border-fail-bg bg-fail-bg text-fail hover:bg-[#f2c9c9]" },
-  ref: { on: "border-ref bg-ref text-white", off: "border-ref-bg bg-ref-bg text-ref hover:bg-[#d9dce5]" },
+  success: { on: "border-success bg-success text-white", off: "border-success-bg bg-success-bg text-success hover:brightness-95" },
+  fail: { on: "border-fail bg-fail text-white", off: "border-fail-bg bg-fail-bg text-fail hover:brightness-95" },
+  ref: { on: "border-ref bg-ref text-white", off: "border-ref-bg bg-ref-bg text-ref hover:brightness-95" },
 };
 
 export function LogForm({ wsId, candidates, onCreated, initialParent, initialPreview }: { wsId: number; candidates: LogNode[]; onCreated?: (n: LogNode) => void; initialParent?: string; initialPreview?: Chain | null }) {

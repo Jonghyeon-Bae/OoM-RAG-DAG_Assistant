@@ -5,22 +5,24 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-50: #f2f7fc;
-  --color-primary-100: #e1eef9;
-  --color-primary-200: #c5ddf2;
-  --color-primary-400: #8fbbe4;
-  --color-primary-700: #2f5f8a;
-  --color-ink: #2b313a;
-  --color-ink-muted: #6b7480;
+  /* 쿨 파스텔 (#083): 바탕은 라벤더 기운의 흰색, 주색은 인디고 슬레이트, 성공은 민트, 실패는 로즈. 회색은 전부 푸른 기운 */
+  --color-primary-50: #f4f6fd;
+  --color-primary-100: #e8edfb;
+  --color-primary-200: #d3dcf7;
+  --color-primary-400: #9db0ea;
+  --color-primary-700: #4a5aa8;
+  --color-primary-800: #3b4a90;
+  --color-ink: #262c3f;
+  --color-ink-muted: #6b7490;
   --color-surface: #ffffff;
-  --color-fail-bg: #f8dada;
-  --color-fail: #b23b3b;
-  --color-success-bg: #dcebfa;
-  --color-success: #2563a8;
-  --color-ref-bg: #e6e8ee;
-  --color-ref: #5c6475;
-  --color-warn-bg: #fbebd2;
-  --color-warn: #9a6418;
+  --color-fail-bg: #fbe3ea;
+  --color-fail: #b03e62;
+  --color-success-bg: #d8f1ec;
+  --color-success: #19726a;
+  --color-ref-bg: #e8ebf4;
+  --color-ref: #5e6784;
+  --color-warn-bg: #f9ecdd;
+  --color-warn: #8b5f27;
   --radius-card: 12px;
 }
 
@@ -69,38 +71,38 @@
 
 :root {
   --font-sans: "Pretendard Variable", Pretendard, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
-  --background: #f2f7fc;
-  --foreground: #2b313a;
+  --background: #f4f6fd;
+  --foreground: #262c3f;
   --card: #ffffff;
-  --card-foreground: #2b313a;
+  --card-foreground: #262c3f;
   --popover: #ffffff;
-  --popover-foreground: #2b313a;
-  --primary: #2f5f8a;
+  --popover-foreground: #262c3f;
+  --primary: #4a5aa8;
   --primary-foreground: #ffffff;
-  --secondary: #e1eef9;
-  --secondary-foreground: #2f5f8a;
-  --muted: #eef3f8;
-  --muted-foreground: #6b7480;
-  --accent: #e1eef9;
-  --accent-foreground: #2f5f8a;
-  --destructive: #b23b3b;
-  --border: #e3e9f0;
-  --input: #e3e9f0;
-  --ring: #8fbbe4;
-  --chart-1: #8fbbe4;
-  --chart-2: #c5ddf2;
-  --chart-3: #2f5f8a;
-  --chart-4: #9cc2ea;
-  --chart-5: #f0c7c7;
+  --secondary: #e8edfb;
+  --secondary-foreground: #4a5aa8;
+  --muted: #eef1fa;
+  --muted-foreground: #6b7490;
+  --accent: #e8edfb;
+  --accent-foreground: #4a5aa8;
+  --destructive: #b03e62;
+  --border: #e1e6f3;
+  --input: #e1e6f3;
+  --ring: #9db0ea;
+  --chart-1: #9db0ea;
+  --chart-2: #d3dcf7;
+  --chart-3: #4a5aa8;
+  --chart-4: #8fd3c6;
+  --chart-5: #f0c3d2;
   --radius: 0.75rem;
   --sidebar: #ffffff;
-  --sidebar-foreground: #2b313a;
-  --sidebar-primary: #2f5f8a;
+  --sidebar-foreground: #262c3f;
+  --sidebar-primary: #4a5aa8;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e1eef9;
-  --sidebar-accent-foreground: #2f5f8a;
-  --sidebar-border: #e3e9f0;
-  --sidebar-ring: #8fbbe4;
+  --sidebar-accent: #e8edfb;
+  --sidebar-accent-foreground: #4a5aa8;
+  --sidebar-border: #e1e6f3;
+  --sidebar-ring: #9db0ea;
 }
 
 @layer base {

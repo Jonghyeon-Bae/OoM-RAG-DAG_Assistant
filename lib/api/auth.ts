@@ -42,7 +42,7 @@ export async function me(): Promise<Me | null> {
 
 export async function logout(): Promise<void> {
   try { await api.post("/auth/logout"); } catch { /* 이미 만료된 세션이어도 첫 화면으로 간다 */ }
-  if (typeof window !== "undefined") window.location.assign("/");
+  if (typeof window !== "undefined") window.location.assign("/login");
 }
 
 export async function consent(): Promise<{ ok: true } | AuthFail> {

@@ -5,7 +5,7 @@ import { DocumentsView } from "@/components/blocks/DocumentsView";
 import { getDocuments, getDocumentEvents } from "@/lib/api";
 import { resolveWs } from "@/lib/ws";
 
-export default async function Page({ params }: { params: Promise<{ wsId: string }> }) {
+export default async function DocumentPage({ params }: { params: Promise<{ wsId: string }> }) {
   const ws = await resolveWs(params);
   if (!ws.policy_enabled) notFound();
   return (

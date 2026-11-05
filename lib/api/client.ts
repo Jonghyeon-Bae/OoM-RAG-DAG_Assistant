@@ -17,7 +17,7 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (axios.isAxiosError(err) && err.response?.status === 401 && err.config?.url !== "/auth/login" && typeof window !== "undefined") {
-      window.location.assign("/");
+      window.location.assign("/login");
     }
     return Promise.reject(err);
   },
@@ -146,7 +146,7 @@ export async function streamChat(wsId: number, query: string, onEvent: (e: ChatE
     signal,
   });
   if (r.status === 401) {
-    window.location.assign("/");
+    window.location.assign("/login");
     return;
   }
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);

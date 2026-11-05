@@ -39,7 +39,7 @@ export function ConsentForm() {
             위 내용을 읽었으며 개인정보 수집·이용에 동의합니다.
           </label>
           {error && <p role="alert" className="rounded-md bg-fail-bg px-3 py-2 text-sm text-fail">{error}</p>}
-          <Button type="button" size="lg" className="h-11 w-full bg-primary-700 text-white hover:bg-[#27507a]" disabled={!checked || busy}
+          <Button type="button" size="lg" className="h-11 w-full bg-primary-700 text-white hover:bg-primary-800" disabled={!checked || busy}
             onClick={async () => { setBusy(true); setError(null); const r = await consent(); if (r.ok) await done(); else { setError(r.message); setBusy(false); } }}>
             {busy && <Loader2 className="size-4 animate-spin" />} 동의하고 계속
           </Button>

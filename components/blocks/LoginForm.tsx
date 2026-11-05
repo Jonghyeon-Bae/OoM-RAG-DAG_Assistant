@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui";
-import { login, me, nextPathFor } from "@/lib/api/auth";
+import { login, nextPathFor } from "@/lib/api/auth";
 
 // 사번·비밀번호 로그인 (작업지시 B-1). 성공 → 동의/비밀번호 게이트 → 홈 워크스페이스
 export function LoginForm() {
@@ -15,12 +15,7 @@ export function LoginForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 이미 로그인된 사용자가 "/" 로 오면 바로 들어간다
-  useEffect(() => {
-    let alive = true;
-    me().then((m) => { if (alive && m) router.replace(nextPathFor(m)); });
-    return () => { alive = false; };
-  }, [router]);
+  // "이미 로그인됐나"는 app/login/page.tsx 가 서버에서 확인해 redirect 한다 — 여기서 하면 폼이 한 번 보인 뒤 이동해 점멸한다
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +41,7 @@ export function LoginForm() {
         <Input id="login-password" name="password" type="password" autoComplete="current-password" className="h-11" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </Field>
       {error && <p id="login-error" role="alert" className="rounded-md bg-fail-bg px-3 py-2 text-sm text-fail">{error}</p>}
-      <Button type="submit" size="lg" className="h-11 w-full bg-primary-700 text-white hover:bg-[#27507a]" disabled={busy || !employeeNo.trim() || !password}>
+      <Button type="submit" size="lg" className="h-11 w-full bg-primary-700 text-white hover:bg-primary-800" disabled={busy || !employeeNo.trim() || !password}>
         {busy ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />} 로그인
       </Button>
     </form>

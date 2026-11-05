@@ -156,7 +156,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
             <div className="flex justify-between"><dt className="text-ink-muted">답변 만족</dt><dd className="font-semibold text-ink">{data.feedback.up + data.feedback.down ? `${Math.round((data.feedback.up / (data.feedback.up + data.feedback.down)) * 100)}%` : "측정 전"}</dd></div>
             <div className="flex justify-between"><dt className="text-ink-muted">첫 응답 시간</dt><dd className="font-semibold text-ink">{data.latency_ms.first_token ? `${(data.latency_ms.first_token / 1000).toFixed(1)}초` : "측정 전"}</dd></div>
           </dl>
-          <Link href={`/w/${wsId}/logs/new`} className="mt-auto inline-flex h-10 items-center justify-center rounded-lg bg-primary-700 text-sm font-semibold text-white hover:bg-[#27507a]">업무로그 등록</Link>
+          <Link href={`/w/${wsId}/logs/new`} className="mt-auto inline-flex h-10 items-center justify-center rounded-lg bg-primary-700 text-sm font-semibold text-white hover:bg-primary-800">업무로그 등록</Link>
         </Card>
       </div>
     </main>

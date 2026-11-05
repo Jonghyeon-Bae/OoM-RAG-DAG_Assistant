@@ -11,7 +11,7 @@ export default async function WorkspaceLayout({
   params: Promise<{ wsId: string }>;
 }) {
   const { wsId } = await params;
-  // 접근 가드 (FE-008 §1 D): 로그인 없음 → server.ts 가 "/" 로. 게이트 미통과 → 게이트. 소속 아님 → 내 첫 워크스페이스
+  // 접근 가드 (FE-008 §1 D): 로그인 없음 → server.ts 가 "/login" 으로. 게이트 미통과 → 게이트. 소속 아님 → 내 첫 워크스페이스
   const me = await getCurrentUser();
   if (me.consent_required) redirect("/gate/consent");
   if (me.must_change_password) redirect("/gate/password");

@@ -15,7 +15,7 @@ async function call(path: string, wsId?: number): Promise<Response> {
       ...(wsId ? { "X-Workspace-Id": String(wsId) } : {}),
     },
   });
-  if (res.status === 401) redirect("/"); // 로그인 없음 → 첫 화면
+  if (res.status === 401) redirect("/login"); // 로그인 없음 → 로그인 화면
   return res;
 }
 
@@ -30,5 +30,13 @@ export async function serverGetOrNull<T>(path: string, wsId?: number): Promise<T
   const res = await call(path, wsId);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`${res.status} ${path}`);
+  return (await res.json()) as T;
+}
+
+// 401 을 redirect 하지 않고 null 로 돌려주는 버전 — "/"·"/login" 처럼 로그인 전에도 열리는 화면 전용 (여기서 redirect 하면 무한 이동)
+export async function serverPeek<T>(path: string): Promise<T | null> {
+  const jar = await cookies();
+  const res = await fetch(`${ORIGIN}/api/v1${path}`, { cache: "no-store", headers: { Accept: "application/json", Cookie: jar.toString() } }).catch(() => null);
+  if (!res || !res.ok) return null;
   return (await res.json()) as T;
 }

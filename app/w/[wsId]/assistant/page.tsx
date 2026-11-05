@@ -2,7 +2,7 @@ import { Header } from "@/components/shell/Header";
 import { AssistantScreen } from "@/components/blocks/AssistantScreen";
 import { resolveWs } from "@/lib/ws";
 
-export default async function Page({ params }: { params: Promise<{ wsId: string }> }) {
+export default async function AssistantPage({ params }: { params: Promise<{ wsId: string }> }) {
   const ws = await resolveWs(params);
   return (
     <>

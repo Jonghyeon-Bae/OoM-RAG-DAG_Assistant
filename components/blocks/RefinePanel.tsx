@@ -131,7 +131,7 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
             {notice && <p role="status" className="mt-3 rounded-md bg-warn-bg px-3 py-2 text-xs text-warn">{notice}</p>}
             {current.refine_status === "done" && (
               <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-                <Link href={`/w/${wsId}/timeline?entry=${current.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-700 px-3 text-sm font-semibold text-white hover:bg-[#27507a]">
+                <Link href={`/w/${wsId}/timeline?entry=${current.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-700 px-3 text-sm font-semibold text-white hover:bg-primary-800">
                   <ExternalLink className="size-4" /> 타임라인에서 보기
                 </Link>
                 <Button variant="outline" size="lg" onClick={() => refine(current.id)} disabled={busyId === current.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다"><RefreshCw className="size-4" /> 다시 정리</Button>
