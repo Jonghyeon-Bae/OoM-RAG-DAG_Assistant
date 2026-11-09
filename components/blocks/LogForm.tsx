@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +33,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
   const [preview, setPreview] = useState<Chain | null>(initialPreview ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [more, setMore] = useState(false); // "더 남기기"(근거 조문) 펼침 — 넣은 조문이 있으면 늘 펼침
   const [refs, setRefs] = useState<RefDraft[]>([]); // 근거 조문(요청 J). 덜 채운 줄이 있으면 등록을 막는다
   const refsIncomplete = refs.some((x) => !refReady(x));
 
@@ -81,6 +83,21 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
 
   return (
     <form className="flex flex-col gap-5" onSubmit={submit}>
+      {/* 순서(#102, UX-004 U3): 어디에 → 유형 → 제목·내용 → 더 남기기(선택) → 고정 등록 바 */}
+      <Field label="어디에 이어서 적나요?" hint={initialParent ? undefined : "새 문제면 '새 장애 건 시작', 이미 있는 문제면 그 장애 건을 고르세요."}>
+        <ParentPicker candidates={candidates} value={parent} onChange={choose} titleHint={title} chain={preview} />
+      </Field>
+
+      {preview && parentNode && (
+        <div className="rounded-xl bg-primary-50 p-3 sm:p-4">
+          <div className="mb-2 flex items-center gap-2 text-xs text-ink-muted">
+            <TypeBadge type={parentNode.type} />
+            <span>이 흐름에 이어집니다 — 새 로그는 <b className="text-ink">{parentNode.title}</b> 다음에 들어갑니다</span>
+          </div>
+          <ChainBlock chain={preview} compact selectedId={parentNode.id} />
+        </div>
+      )}
+
       <Field label="로그 유형 (원클릭 태깅)">
         <div role="radiogroup" className="grid grid-cols-3 gap-2">
           {(["success", "fail", "ref"] as LogType[]).map((t) => (
@@ -115,20 +132,6 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         <Textarea id="log-body" name="body" className="min-h-[120px]" placeholder={guide[type].body} required />
       </Field>
 
-      <Field label="어디에 이어서 적나요?" hint={initialParent ? undefined : "새 문제면 '새 장애 건 시작', 이미 있는 문제면 그 장애 건을 고르세요."}>
-        <ParentPicker candidates={candidates} value={parent} onChange={choose} titleHint={title} chain={preview} />
-      </Field>
-
-      {preview && parentNode && (
-        <div className="rounded-xl bg-primary-50 p-4">
-          <div className="mb-2 flex items-center gap-2 text-xs text-ink-muted">
-            <TypeBadge type={parentNode.type} />
-            <span>이 흐름에 이어집니다 — 새 로그는 <b className="text-ink">{parentNode.title}</b> 다음에 들어갑니다</span>
-          </div>
-          <ChainBlock chain={preview} compact selectedId={parentNode.id} />
-        </div>
-      )}
-
       {type === "success" && parent !== ROOT && (
         <label className="flex items-start gap-3 rounded-lg border border-success-bg bg-success-bg/40 p-3 text-sm">
           <input type="checkbox" name="resolve_root" checked={resolveRoot} onChange={(e) => setResolveRoot(e.target.checked)} className="mt-0.5 size-4 accent-[var(--color-success)]" />
@@ -139,11 +142,20 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         </label>
       )}
 
-      <Field label="근거 조문 (선택)" hint="이 조치가 사내 규정을 따랐는지, 예외였는지, 기준이 없었는지 남기면 AI 답변이 규정과 사례를 함께 인용합니다.">
-        <PolicyRefsInput wsId={wsId} value={refs} onChange={setRefs} />
-      </Field>
+      <div className="rounded-lg border border-border">
+        <button type="button" onClick={() => setMore((m) => !m)} aria-expanded={more || refs.length > 0} className="flex w-full items-center justify-between px-3 py-3 text-left text-sm font-semibold text-ink pointer-coarse:min-h-11">
+          <span>더 남기기 <span className="font-normal text-ink-muted">(선택 · 근거 조문{refs.length ? ` ${refs.length}건` : ""})</span></span>
+          <ChevronDown className={cn("size-4 text-ink-muted transition-transform", (more || refs.length > 0) && "rotate-180")} />
+        </button>
+        {(more || refs.length > 0) && <div className="border-t border-border p-3">
+          <Field label="근거 조문 (선택)" hint="이 조치가 사내 규정을 따랐는지, 예외였는지, 기준이 없었는지 남기면 AI 답변이 규정과 사례를 함께 인용합니다.">
+            <PolicyRefsInput wsId={wsId} value={refs} onChange={setRefs} />
+          </Field>
+        </div>}
+      </div>
 
-      <div className="flex gap-3 pt-1">
+      {/* 등록 바: 휴대폰은 하단 탭 바 바로 위에 붙어 있다(D-006) */}
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 -mx-4 flex gap-3 border-t border-border bg-card px-4 py-3 sm:-mx-6 sm:px-6 lg:bottom-0">
         <Button type="reset" variant="outline" size="lg" className="h-11 flex-1" onClick={() => { setType("fail"); setTitle(""); setParent(ROOT); setPreview(null); setResolveRoot(false); setRefs([]); }}>
           초기화
         </Button>

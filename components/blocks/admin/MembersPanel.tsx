@@ -44,14 +44,33 @@ export function MembersPanel({ wsId, wsName, initial }: { wsId: number; wsName: 
     if (r.ok) await reload();
   };
 
+  const status = (m: Member) =>
+    m.locked ? (
+      <Button variant="outline" size="xs" onClick={() => unlock(m)} disabled={unlocking === m.id} title="로그인 연속 실패로 잠긴 계정. 풀면 바로 로그인할 수 있습니다">
+        {unlocking === m.id ? <Loader2 className="size-3 animate-spin" /> : <Lock className="size-3" />} 잠금 해제
+      </Button>
+    ) : <span className="text-xs text-ink-muted">정상</span>;
+
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <Card className="min-w-0 gap-3 p-6">
+    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]">
+      <Card className="min-w-0 gap-3 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-bold text-ink">{wsName} 멤버 <span className="text-sm font-normal text-ink-muted">{members.length}명</span></h2>
           {notice && <span role="status" className="text-xs text-ink-muted">{notice}</span>}
         </div>
-        <div className="overflow-x-auto">
+        {/* 휴대폰: 표 대신 2줄 목록(가로 스크롤 없이) */}
+        <ul className="divide-y divide-border sm:hidden">
+          {members.map((m) => (
+            <li key={m.id} className="flex items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-sm text-ink">{m.name}<span className="text-xs text-ink-muted">{m.title ?? ""}</span><Chip tone={m.role === "admin" ? "primary" : "neutral"} className="h-5 text-xs">{roleLabel[m.role]}</Chip></div>
+                <div className="mt-0.5 truncate text-xs text-ink-muted"><span className="tabular-nums">{m.employee_no}</span> · {m.email_masked ?? "이메일 없음"}</div>
+              </div>
+              <div className="shrink-0">{status(m)}</div>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[560px] text-sm">
             <thead><tr className="border-b border-border text-left text-xs text-ink-muted"><th className="py-2 font-medium">이름</th><th className="font-medium">사번</th><th className="font-medium">직함</th><th className="font-medium">이메일</th><th className="font-medium">역할</th><th className="text-right font-medium">상태</th></tr></thead>
             <tbody>
@@ -61,13 +80,9 @@ export function MembersPanel({ wsId, wsName, initial }: { wsId: number; wsName: 
                   <td className="tabular-nums text-ink-muted">{m.employee_no}</td>
                   <td className="text-ink-muted">{m.title ?? "—"}</td>
                   <td className="text-ink-muted">{m.email_masked ?? "—"}</td>
-                  <td><Chip tone={m.role === "admin" ? "primary" : "neutral"} className="h-5 text-[11px]">{roleLabel[m.role]}</Chip></td>
+                  <td><Chip tone={m.role === "admin" ? "primary" : "neutral"} className="h-5 text-xs">{roleLabel[m.role]}</Chip></td>
                   <td className="text-right">
-                    {m.locked ? (
-                      <Button variant="outline" size="xs" onClick={() => unlock(m)} disabled={unlocking === m.id} title="로그인 연속 실패로 잠긴 계정. 풀면 바로 로그인할 수 있습니다">
-                        {unlocking === m.id ? <Loader2 className="size-3 animate-spin" /> : <Lock className="size-3" />} 잠금 해제
-                      </Button>
-                    ) : <span className="text-xs text-ink-muted">정상</span>}
+                    {status(m)}
                   </td>
                 </tr>
               ))}

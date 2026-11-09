@@ -19,9 +19,9 @@ export default async function WorkspaceLayout({
   const ws = await getWorkspace(id);
   if (!ws) notFound();
   return (
-    <div className="flex min-h-screen flex-1 flex-col md:flex-row">
+    <div className="flex min-h-screen flex-1 flex-col lg:flex-row">
       <Sidebar wsId={ws.id} policyEnabled={ws.policy_enabled} caseEnabled={ws.case_enabled} adminMenu={accessOf(me, ws.id).adminMenu} />
-      <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
     </div>
   );
 }

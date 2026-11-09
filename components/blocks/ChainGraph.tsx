@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Chain, ChainNode } from "@/lib/types/domain";
-import { ChainNodeCard, reasonsByChild } from "@/components/blocks/ChainBlock";
+import { ChainNodeCard, reasonsByChild, parentsByChild, stepLabel, useFits, CARD_MAX } from "@/components/blocks/ChainBlock";
+import { ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // B-44 (xyflow 도입 전 폴백): 깊이별 열 배치 + 실제 간선을 SVG로 그린다.
@@ -30,6 +31,9 @@ function orderByParent(chain: Chain): ChainNode[][] {
 export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; selectedId?: number; onSelect?: (id: number) => void }) {
   const cols = useMemo(() => orderByParent(chain), [chain]);
   const reasons = useMemo(() => reasonsByChild(chain), [chain]);
+  const parents = useMemo(() => parentsByChild(chain), [chain]);
+  // 열 배치가 칸에 안 들어가면 세로(단계별) — 데스크톱 좁은 칸·휴대폰 공통 (D-004·D-012, #102)
+  const { ref: fitRef, fits } = useFits(cols.length * CARD_MAX + (cols.length - 1) * 64);
   const wrap = useRef<HTMLDivElement>(null);
   const refs = useRef(new Map<number, HTMLDivElement>());
   const [boxes, setBoxes] = useState<Map<number, Box>>(new Map());
@@ -45,12 +49,12 @@ export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; sele
     });
     setBoxes(m);
   };
-  useLayoutEffect(measure, [chain]);
+  useLayoutEffect(measure, [chain, fits]);
   useEffect(() => {
     const ro = new ResizeObserver(measure);
     if (wrap.current) ro.observe(wrap.current);
     return () => ro.disconnect();
-  }, []);
+  }, [fits]);
 
   // 선택 노드 기준 관련 집합: 조상 전체 + 자신 + 자손 전체 (선택 노드를 지나는 모든 경로)
   const related = useMemo(() => {
@@ -74,7 +78,37 @@ export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; sele
     return s;
   }, [chain, selectedId]);
 
+  const pick = (id: number) => ({
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: () => onSelect?.(id),
+    onKeyDown: (e: React.KeyboardEvent) => (e.key === "Enter" || e.key === " ") && onSelect?.(id),
+  });
+
+  if (!fits) {
+    return (
+      <div ref={fitRef} className="min-w-0">
+        <ol className="flex flex-col gap-1">
+          {cols.map((col, ci) => (
+            <li key={ci}>
+              {ci > 0 && <ArrowDown className="mx-auto mb-1 size-4 text-ink-muted" />}
+              <div className="mb-1 text-xs font-semibold text-ink-muted">{stepLabel(ci)}</div>
+              <div className="flex flex-col gap-2">
+                {col.map((n) => (
+                  <div key={n.id} {...pick(n.id)} className={cn("transition-opacity", selectedId && !related.has(n.id) && "opacity-30")}>
+                    <ChainNodeCard node={n} fluid selected={n.id === selectedId} reasons={reasons.get(n.id)} parents={ci > 0 && cols[ci - 1].length > 1 ? parents.get(n.id) : []} />
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
+
   return (
+    <div ref={fitRef} className="min-w-0">
     <div ref={wrap} className="relative overflow-x-auto py-1">
       <div className="flex items-start gap-16">
         {cols.map((col, ci) => (
@@ -88,10 +122,7 @@ export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; sele
                     if (el) refs.current.set(n.id, el);
                     else refs.current.delete(n.id);
                   }}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelect?.(n.id)}
-                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.(n.id)}
+                  {...pick(n.id)}
                   className={cn("transition-opacity", dim && "opacity-30")}
                 >
                   <ChainNodeCard node={n} selected={n.id === selectedId} reasons={reasons.get(n.id)} />
@@ -125,6 +156,7 @@ export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; sele
           );
         })}
       </svg>
+    </div>
     </div>
   );
 }

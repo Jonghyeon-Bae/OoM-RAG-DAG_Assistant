@@ -9,13 +9,13 @@ const fmtAt = (iso: string) => new Date(iso).toLocaleString("ko-KR", { month: "n
 
 function Kpi({ label, value, sub, subTone = "neutral", sample = false }: { label: string; value: React.ReactNode; sub?: string; subTone?: "neutral" | "fail" | "primary"; sample?: boolean }) {
   return (
-    <Card className="gap-2 p-6">
+    <Card className="min-w-0 gap-2 p-4 sm:p-6">
       <div className="flex items-center justify-between text-sm text-ink-muted">
         <span>{label}</span>
-        {sample && <Chip tone="warn" className="h-5 text-[11px]" title="실측 전 예시값. E6 평가·실험 후 교체">예시</Chip>}
+        {sample && <Chip tone="warn" className="h-5 text-xs" title="실측 전 예시값. E6 평가·실험 후 교체">예시</Chip>}
       </div>
-      <div className="text-3xl font-bold tracking-tight text-ink">{value}</div>
-      {sub && <Chip tone={subTone} className="w-fit">{sub}</Chip>}
+      <div className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{value}</div>
+      {sub && <Chip tone={subTone} className="h-auto w-fit max-w-full whitespace-normal py-0.5">{sub}</Chip>}
     </Card>
   );
 }
@@ -26,13 +26,13 @@ function RetrievalCard({ r }: { r: DashboardSummary["retrieval"] }) {
   if (!r) return <Card className="flex-row items-center gap-3 p-4 text-sm text-ink-muted"><Chip>검색 정확도</Chip>측정 전입니다. 평가 실행 후 표시됩니다.</Card>;
   const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
   return (
-    <Card className="gap-3 p-5">
+    <Card className="gap-3 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h2 className="font-bold text-ink">검색 정확도</h2>
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+          <h2 className="shrink-0 font-bold text-ink">검색 정확도</h2>
           <span className="text-xs text-ink-muted">평가 질문 {r.n_samples}건 중 정답 근거가 상위 5개 안에 든 비율</span>
         </div>
-        <span className="text-[11px] text-ink-muted" title={[r.embedding_model, r.dataset_version, r.mode].filter(Boolean).join(" · ")}>측정 {fmtAt(r.run_at)}</span>
+        <span className="text-xs text-ink-muted" title={[r.embedding_model, r.dataset_version, r.mode].filter(Boolean).join(" · ")}>측정 {fmtAt(r.run_at)}</span>
       </div>
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
         <div><div className="text-3xl font-bold tracking-tight text-ink">{pct(r.hit_at_5)}</div><div className="text-xs text-ink-muted">전체</div></div>
@@ -78,9 +78,9 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
   const reduce = hasSt ? Math.round((1 - st.after_min / st.before_min) * 100) : null;
   const fmt = (v: number | null) => (v == null ? "—" : v.toFixed(2));
   return (
-    <main className="flex flex-col gap-6 p-4 md:p-6 xl:p-8">
+    <main className="flex flex-col gap-4 p-3 sm:gap-6 md:p-6 xl:p-8">
       {/* B-50 KPI */}
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Kpi label="평균 정보 탐색 시간" value={hasSt ? <>{st.before_min}<span className="mx-1 text-ink-muted">→</span>{st.after_min}분</> : "—"} sub={reduce === null ? "측정 전" : `-${reduce}% 단축`} subTone="primary" sample={data.is_sample} />
         <Kpi label="Faithfulness" value={fmt(ev.faithfulness)} sub="답변이 근거에 충실한 정도" sample={data.is_sample} />
         <Kpi label="Answer Relevance" value={fmt(ev.answer_relevance)} sub="질문에 맞는 답인지" sample={data.is_sample} />
@@ -94,7 +94,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
           <div className="text-sm text-ink-muted">이번 주 질문</div>
           <div className="text-3xl font-bold tracking-tight text-ink">{queries.week}건<span className="ml-2 text-sm font-normal text-ink-muted">누적 {queries.total}</span></div>
           <div className="mt-1 flex flex-wrap gap-1.5">
-            {queries.by_intent.map((b) => <Chip key={b.intent} tone={b.count ? "primary" : "neutral"} className="h-5 text-[11px]">{intentLabel[b.intent]} {b.count}</Chip>)}
+            {queries.by_intent.map((b) => <Chip key={b.intent} tone={b.count ? "primary" : "neutral"} className="h-5 text-xs">{intentLabel[b.intent]} {b.count}</Chip>)}
           </div>
         </Card>
         <Card className="gap-2 p-6">
@@ -120,9 +120,9 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
             <ul className="divide-y divide-border">
               {noEv.recent.map((q) => (
                 <li key={q.session_id} className="flex items-center gap-3 py-2 text-sm">
-                  <span className="w-20 shrink-0 text-[11px] tabular-nums text-ink-muted">{fmtAt(q.created_at)}</span>
+                  <span className="w-20 shrink-0 text-xs tabular-nums text-ink-muted">{fmtAt(q.created_at)}</span>
                   <span className="min-w-0 flex-1 truncate text-ink">{q.query}</span>
-                  <Chip className="h-5 shrink-0 text-[11px]">{intentLabel[q.intent]}</Chip>
+                  <Chip className="h-5 shrink-0 text-xs">{intentLabel[q.intent]}</Chip>
                   <Link href={`/w/${wsId}/logs/new`} className="shrink-0 text-xs font-medium text-primary-700 hover:underline">로그 등록</Link>
                 </li>
               ))}
@@ -143,7 +143,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
                   <TypeBadge type={r.type} />
                   <Link href={`/w/${wsId}/timeline?entry=${r.node_id}`} className="min-w-0 flex-1 truncate text-ink hover:underline">{r.title}</Link>
                   <span className="shrink-0 text-xs text-ink-muted">{r.author_name}</span>
-                  <Chip tone="primary" className="h-5 shrink-0 text-[11px]">{r.count}회</Chip>
+                  <Chip tone="primary" className="h-5 shrink-0 text-xs">{r.count}회</Chip>
                 </li>
               ))}
             </ol>

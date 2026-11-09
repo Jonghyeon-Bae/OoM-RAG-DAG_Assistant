@@ -81,8 +81,8 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
                       <RowGroup key={d.id}>
                         <tr className={cn("border-t [&>td]:px-5 [&>td]:py-3", retired && "text-ink-muted", panel.doc?.id === d.id && "bg-primary-50/60")}>
                           <td className="font-medium text-ink">{d.version}</td>
-                          <td><Chip tone="neutral" className="h-5 text-[11px]">{srcLabel[d.source_type]}</Chip> {d.visibility === "company" && <Chip tone="primary" className="h-5 text-[11px]" title="전사 공통 규정">전사</Chip>}</td>
-                          <td>{retired ? <Chip tone="dark" className="h-5 text-[11px]" title={[d.retired_by && `처리: ${d.retired_by}`, d.retire_reason && `사유: ${d.retire_reason}`].filter(Boolean).join(" / ") || undefined}>폐기 · {fmt(d.retired_at)}</Chip> : <Chip tone="primary" className="h-5 text-[11px]">사용 중</Chip>}</td>
+                          <td><Chip tone="neutral" className="h-5 text-xs">{srcLabel[d.source_type]}</Chip> {d.visibility === "company" && <Chip tone="primary" className="h-5 text-xs" title="전사 공통 규정">전사</Chip>}</td>
+                          <td>{retired ? <Chip tone="dark" className="h-5 text-xs" title={[d.retired_by && `처리: ${d.retired_by}`, d.retire_reason && `사유: ${d.retire_reason}`].filter(Boolean).join(" / ") || undefined}>폐기 · {fmt(d.retired_at)}</Chip> : <Chip tone="primary" className="h-5 text-xs">사용 중</Chip>}</td>
                           <td className="text-right tabular-nums">{d.chunk_count}</td>
                           <td className="tabular-nums" title={`등록: ${d.uploaded_by} · ${fmt(d.uploaded_at)}`}>{fmt(d.indexed_at)}<span className="ml-1 text-xs text-ink-muted">{d.uploaded_by}</span></td>
                           <td>
@@ -147,7 +147,7 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
               <ul className="max-h-[70vh] space-y-2 overflow-auto">
                 {panel.items.map((c) => (
                   <li key={c.id} className="rounded-card border bg-white p-3 text-sm">
-                    <div className="mb-1 flex items-center justify-between text-[11px] text-ink-muted"><span>{c.article_label}</span><span className="font-mono">{c.id}</span></div>
+                    <div className="mb-1 flex items-center justify-between text-xs text-ink-muted"><span>{c.article_label}</span><span className="font-mono">{c.id}</span></div>
                     <p className="leading-relaxed text-ink">{c.text}</p>
                   </li>
                 ))}
@@ -165,8 +165,8 @@ export function DocumentsView({ wsId, initial, initialEvents }: { wsId: number; 
                 {panel.items.map((e) => (
                   <li key={e.id} className="rounded-card border bg-white p-3 text-sm">
                     <div className="flex items-center justify-between gap-2">
-                      <Chip tone={actionTone[e.action]} className="h-5 text-[11px]">{actionLabel[e.action]}</Chip>
-                      <span className="text-[11px] tabular-nums text-ink-muted">{fmt(e.at)}</span>
+                      <Chip tone={actionTone[e.action]} className="h-5 text-xs">{actionLabel[e.action]}</Chip>
+                      <span className="text-xs tabular-nums text-ink-muted">{fmt(e.at)}</span>
                     </div>
                     {!panel.doc && <div className="mt-1 font-medium text-ink">{e.document_label}</div>}
                     <div className="mt-1 text-xs text-ink-muted">{e.actor} · {e.source === "ui" ? "화면" : "스크립트"}{e.reason && ` · ${e.reason}`}</div>

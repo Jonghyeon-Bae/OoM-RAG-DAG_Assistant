@@ -31,6 +31,7 @@ export function ParentPicker({
   const parentNode = candidates.find((c) => String(c.id) === value) ?? null;
   const [locked, setLocked] = useState(!!parentNode); // ?parent= 진입: 요약만 보여주고 "변경"으로 연다
   const [q, setQ] = useState("");
+  const [limit, setLimit] = useState(5); // 목록 안 스크롤 대신 "더 보기"(D-006·D-013, #102)
   const [rootId, setRootId] = useState<number | null>(parentNode?.root_id ?? null);
 
   const groups = useMemo<Group[]>(() => {
@@ -142,28 +143,36 @@ export function ParentPicker({
       <div className="rounded-lg border border-border">
         <div className="flex items-center justify-between border-b border-border bg-primary-50 px-3 py-2">
           <span className="text-xs font-semibold text-ink">이미 등록된 장애 건 {groups.length}건</span>
-          <span className="text-[11px] text-ink-muted">진행 중 먼저 · 최근 활동순</span>
+          <span className="text-xs text-ink-muted">진행 중 먼저 · 최근 활동순</span>
         </div>
         <div className="relative border-b border-border">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목 · 에러 코드 · #키워드로 찾기" className="h-10 rounded-none border-0 pl-9 shadow-none focus-visible:ring-0" />
         </div>
-        <ul className="max-h-48 overflow-y-auto">
-          {filtered.slice(0, 20).map((g) => {
+        <ul>
+          {filtered.slice(0, limit).map((g) => {
             const on = g.root.root_id === rootId;
             return (
               <li key={g.root.root_id}>
-                <button type="button" onClick={() => pickRoot(g)} className={cn("flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-primary-50", on && "bg-primary-100")}>
+                <button type="button" onClick={() => pickRoot(g)} className={cn("flex w-full items-start gap-2 border-b border-border/60 px-3 py-2.5 text-left text-sm hover:bg-primary-50", on && "bg-primary-100")}>
                   <TypeBadge type={g.root.type} />
-                  <span className={cn("min-w-0 flex-1 truncate", g.root.resolved_at ? "text-ink-muted line-through" : "text-ink")}>{g.root.title}</span>
-                  {g.root.error_code && <Chip tone="fail" className="h-5 shrink-0 text-[11px]">{g.root.error_code}</Chip>}
-                  <span className="shrink-0 text-xs text-ink-muted">{g.nodes.length}건{g.root.resolved_at ? " · 완료" : ""}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className={cn("line-clamp-2 leading-snug", g.root.resolved_at ? "text-ink-muted line-through" : "text-ink")}>{g.root.title}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+                      {g.root.error_code && <Chip tone="fail" className="h-5 text-xs">{g.root.error_code}</Chip>}
+                      {g.nodes.length}건{g.root.resolved_at ? " · 완료" : ""}
+                    </span>
+                  </span>
                 </button>
               </li>
             );
           })}
           {filtered.length === 0 && <li className="px-3 py-4 text-center text-xs text-ink-muted">{q ? "검색 결과가 없습니다" : "아직 등록된 장애 건이 없습니다 — 위의 \u201c새 장애 건 시작\u201d으로 적으세요"}</li>}
-          {filtered.length > 20 && <li className="px-3 py-2 text-center text-xs text-ink-muted">상위 20건만 표시 — 검색어로 좁혀 주세요</li>}
+          {filtered.length > limit && (
+            <li>
+              <button type="button" onClick={() => setLimit((n) => n + 10)} className="w-full px-3 py-2.5 text-center text-xs font-semibold text-primary-700 hover:bg-primary-50 pointer-coarse:min-h-11">더 보기 ({filtered.length - limit}건) — 검색어로 좁힐 수도 있습니다</button>
+            </li>
+          )}
         </ul>
       </div>
 
@@ -179,10 +188,10 @@ export function ParentPicker({
               const on = String(n.id) === value;
               const dead = n.status === "deprecated";
               return (
-                <li key={n.id} style={{ paddingLeft: depthOf(n, group.root) * 16 }}>
-                  <button type="button" disabled={dead} onClick={() => onChange(String(n.id))} className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm", on ? "bg-primary-700 text-white" : "hover:bg-primary-100", dead && "opacity-40 line-through")}>
+                <li key={n.id} style={{ paddingLeft: depthOf(n, group.root) * 12 }}>
+                  <button type="button" disabled={dead} onClick={() => onChange(String(n.id))} className={cn("flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm pointer-coarse:min-h-11", on ? "bg-primary-700 text-white" : "hover:bg-primary-100", dead && "opacity-40 line-through")}>
                     <span className={cn("size-1.5 rounded-full", n.type === "fail" ? "bg-fail" : n.type === "success" ? "bg-success" : "bg-ref", on && "bg-white")} />
-                    <span className="truncate">{n.title}</span>
+                    <span className="line-clamp-2">{n.title}</span>
                   </button>
                 </li>
               );

@@ -65,7 +65,7 @@ export function MyPageView({ me, wsId, daysLeft, maxAgeDays }: { me: Me; wsId: n
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-2xl font-bold text-ink">{me.name}</h2>
               {me.title && <span className="text-sm text-ink-muted">{me.title}</span>}
-              {me.company_admin && <Chip tone="dark" className="h-6 text-[11px]" title="회사 전체(전사 공통)의 관리자">회사 관리자</Chip>}
+              {me.company_admin && <Chip tone="dark" className="h-6 text-xs" title="회사 전체(전사 공통)의 관리자">회사 관리자</Chip>}
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-muted">
               <span className="tabular-nums">{me.employee_no}</span>
@@ -97,12 +97,12 @@ export function MyPageView({ me, wsId, daysLeft, maxAgeDays }: { me: Me; wsId: n
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Link href={`/w/${w.id}/assistant`} className="truncate text-sm font-medium text-ink hover:underline">{w.name}</Link>
-                      {w.id === me.workspace_id && <Chip tone="primary" className="h-5 text-[10px]" title="로그인하면 처음 열리는 부서">기본</Chip>}
-                      {w.id === wsId && <Chip className="h-5 text-[10px]">지금 보는 곳</Chip>}
+                      {w.id === me.workspace_id && <Chip tone="primary" className="h-5 text-xs" title="로그인하면 처음 열리는 부서">기본</Chip>}
+                      {w.id === wsId && <Chip className="h-5 text-xs">지금 보는 곳</Chip>}
                     </div>
                     <div className="mt-0.5 text-xs text-ink-muted">{roleLabel[w.role] ?? w.role}{w.can_configure && " · 부서 설정 가능"}</div>
                   </div>
-                  <Chip tone={modeTone(modeOf(w))} className="h-5 shrink-0 text-[10px]">{modeShort[modeOf(w)]}</Chip>
+                  <Chip tone={modeTone(modeOf(w))} className="h-5 shrink-0 text-xs">{modeShort[modeOf(w)]}</Chip>
                 </li>
               ))}
             </ul>

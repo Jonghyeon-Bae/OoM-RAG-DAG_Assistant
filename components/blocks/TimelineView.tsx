@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw } from "lucide-react";
+import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, ArrowDown, ArrowUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,14 +39,20 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
   const [limit, setLimit] = useState(PAGE);
   const [, startTransition] = useTransition();
   const cardRefs = useRef(new Map<number, HTMLLIElement>());
+  // 휴대폰·태블릿(1열): 장애 건을 고르면 해결 흐름으로 내려가고, 흐름에서 목록으로 돌아온다(D-002)
+  const flowRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLElement>(null);
+  const oneColumn = () => window.matchMedia("(max-width: 1023px)").matches;
+  const jumpToFlow = () => { if (oneColumn()) setTimeout(() => flowRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60); };
+  const backToList = () => (cardRefs.current.get(entryId) ?? listRef.current)?.scrollIntoView({ behavior: "smooth", block: "center" });
 
   // 장애 건(루트) 단위 그룹 — 받은 전체 목록에서 계산 (페이지네이션되면 서버 집계로 이동)
-  const groups = useMemo<Group[]>(() => {
+  const { groups, hiddenResolved } = useMemo(() => {
     const byRoot = new Map<number, LogNode[]>();
     logs.forEach((l) => byRoot.set(l.root_id, [...(byRoot.get(l.root_id) ?? []), l]));
     const ql = q.trim().toLowerCase();
     const hit = (l: LogNode) => !ql || l.title.toLowerCase().includes(ql) || l.body.toLowerCase().includes(ql) || l.error_code?.toLowerCase().includes(ql) || l.keywords.some((k) => k.toLowerCase().includes(ql));
-    return [...byRoot.entries()]
+    const matched: Group[] = [...byRoot.entries()]
       .map(([rid, nodes]) => {
         const root = nodes.find((n) => n.id === rid) ?? nodes[0];
         const pool = nodes.filter((n) => !hideDeprecated || n.status === "active" || n.id === rid);
@@ -61,8 +67,11 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
           .sort((a, b) => a.path_label.localeCompare(b.path_label) || a.created_at.localeCompare(b.created_at)); // 트리 순서(원인 → 해결), 같은 깊이는 시간순
         return { root, nodes: visible, dim, total: nodes.filter((n) => n.status === "active").length, hasSuccess: nodes.some((n) => n.id !== root.id && n.type === "success" && n.status === "active"), last: nodes.reduce((m, n) => (n.created_at > m ? n.created_at : m), ""), resolved: !!root.resolved_at };
       })
-      .filter((g) => g.nodes.length > 0 && (showResolved || !g.resolved || g.root.root_id === logs.find((l) => l.id === entryId)?.root_id))
-      .sort((a, b) => b.last.localeCompare(a.last));
+      .filter((g) => g.nodes.length > 0);
+    // 완료 숨김은 검색 뒤에 적용 — 검색·필터가 완료 건에만 맞으면 그 수를 따로 알려 준다(D-001)
+    const entryRoot = logs.find((l) => l.id === entryId)?.root_id;
+    const kept: Group[] = matched.filter((g) => showResolved || !g.resolved || g.root.root_id === entryRoot).sort((a, b) => b.last.localeCompare(a.last));
+    return { groups: kept, hiddenResolved: type !== "all" || ql ? matched.length - kept.length : 0 };
   }, [logs, type, q, showResolved, hideDeprecated, entryId]);
 
   const counts = useMemo(
@@ -208,60 +217,66 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
   const shown = groups.slice(0, limit);
 
   return (
-    <main className="grid items-start gap-6 p-4 md:p-6 xl:grid-cols-[460px_1fr] xl:p-8">
+    <main className="grid items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:grid-cols-[460px_minmax(0,1fr)] xl:p-8">
       {flash && (
-        <div role="status" className="fixed right-6 top-6 z-50 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-lg">
+        <div role="status" className="fixed inset-x-3 top-3 z-50 flex items-center gap-3 sm:inset-x-auto sm:right-6 sm:top-6 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-lg">
           <span className="text-ink">{flash}</span>
           <button type="button" onClick={() => setFlash(null)} className="rounded px-1 text-ink-muted hover:bg-primary-100" aria-label="닫기">×</button>
         </div>
       )}
-      <section className="min-w-0">
+      <section ref={listRef} className="min-w-0">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-bold text-ink">장애 건 타임라인</h2>
-            <p className="mt-0.5 text-xs text-ink-muted">장애 건 › 원인(실패) › 해결(성공)·참고 순으로 이어집니다</p>
+            <p className="mt-0.5 hidden text-xs text-ink-muted sm:block">장애 건 › 원인(실패) › 해결(성공)·참고 순으로 이어집니다</p>
           </div>
           <div className="relative w-full sm:w-60">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
-            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목 · 본문 · 오류 코드 · #키워드" className="h-9 w-full pl-9" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목 · 본문 · 오류 코드 · #키워드" className="h-9 w-full pl-9 pointer-coarse:h-11" />
           </div>
         </div>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {typeFilters.map((f) => (
-            <button key={f.key} type="button" onClick={() => setType(f.key)} className={cn("flex h-8 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors", f.key === type ? "bg-primary-700 text-white" : f.cls)}>
+            <button key={f.key} type="button" onClick={() => setType(f.key)} className={cn("flex h-8 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors pointer-coarse:h-11 pointer-coarse:px-4", f.key === type ? "bg-primary-700 text-white" : f.cls)}>
               {f.label} {counts[f.key]}
             </button>
           ))}
-          <label className="ml-auto flex items-center gap-1.5 text-xs text-ink-muted">
+          <label className="ml-auto flex items-center gap-1.5 text-xs text-ink-muted pointer-coarse:min-h-11">
             <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} className="size-3.5 accent-[var(--color-primary-700)]" />
             완료 건 표시 ({resolvedCount})
           </label>
           {counts.deprecated > 0 && (
-            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+            <label className="flex items-center gap-1.5 text-xs text-ink-muted pointer-coarse:min-h-11">
               <input type="checkbox" checked={!hideDeprecated} onChange={(e) => setHideDeprecated(!e.target.checked)} className="size-3.5 accent-[var(--color-primary-700)]" />
               폐기 표시 ({counts.deprecated})
             </label>
           )}
         </div>
 
+        {hiddenResolved > 0 && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-primary-50 px-3 py-2 text-xs text-ink">
+            <span>완료된 장애 건에서도 <b>{hiddenResolved}건</b>이 맞습니다</span>
+            <Button size="xs" variant="outline" onClick={() => setShowResolved(true)}>완료 건 표시</Button>
+          </div>
+        )}
         <div className="flex flex-col gap-3">
           {shown.map((g) => {
             const isOpen = open.has(g.root.root_id);
             return (
-              <Card key={g.root.root_id} className={cn("gap-0 overflow-visible p-0", g.resolved && "opacity-80")}>
+              <Card key={g.root.root_id} className={cn("@container gap-0 overflow-visible p-0", g.resolved && "opacity-80")}>
                 {/* 그룹 헤더 = 장애 건(메인 로그). 제목이 1행, 메타가 2행. 제목 클릭 = 루트 선택, 셰브론 = 펼침 */}
-                <div className={cn("flex flex-wrap items-start gap-3 px-4 py-3", g.root.id === entryId && "bg-primary-50")}>
-                  <button type="button" onClick={() => toggleGroup(g.root.root_id)} className="mt-1 shrink-0 rounded p-0.5 text-ink-muted hover:bg-primary-100" aria-expanded={isOpen} aria-label={isOpen ? "접기" : "펼치기"}>
+                <div className={cn("flex flex-wrap items-start gap-2 px-3 py-3 sm:gap-3 sm:px-4", g.root.id === entryId && "bg-primary-50")}>
+                  <button type="button" onClick={() => toggleGroup(g.root.root_id)} className="mt-1 shrink-0 rounded p-0.5 text-ink-muted hover:bg-primary-100 pointer-coarse:-m-2.5 pointer-coarse:mt-[-6px] pointer-coarse:p-3" aria-expanded={isOpen} aria-label={isOpen ? "접기" : "펼치기"}>
                     <ChevronDown className={cn("size-4 transition-transform", !isOpen && "-rotate-90")} />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <button type="button" onClick={() => { select(g.root.id); setOpen((o) => new Set(o).add(g.root.root_id)); }} className="block w-full text-left">
+                    <button type="button" onClick={() => { select(g.root.id); setOpen((o) => new Set(o).add(g.root.root_id)); jumpToFlow(); }} className="block w-full text-left pointer-coarse:-my-2.5 pointer-coarse:py-2.5">
                       <div className={cn("text-[15px] font-bold leading-snug text-ink", g.resolved && "line-through opacity-70")}>{g.root.title}</div>
                     </button>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
                       <TypeBadge type={g.root.type} />
-                      {g.root.error_code && <Chip tone="fail" className="h-5 text-[11px]">{g.root.error_code}</Chip>}
-                      {g.root.type === "ref" ? <Chip tone="neutral" className="h-5 text-[11px]" title="절차·자료 기록. 완료 처리 대상이 아닙니다">자료</Chip> : g.resolved ? <Chip tone="primary" className="h-5 text-[11px]" title={g.root.resolve_note ? `완료 사유: ${g.root.resolve_note}` : "이어진 해결 로그로 완료"}>완료{g.root.resolve_note && " · 사유 있음"}</Chip> : <Chip tone="warn" className="h-5 text-[11px]">진행 중</Chip>}
+                      {g.root.error_code && <Chip tone="fail" className="h-5 text-xs">{g.root.error_code}</Chip>}
+                      {g.root.type === "ref" ? <Chip tone="neutral" className="h-5 text-xs" title="절차·자료 기록. 완료 처리 대상이 아닙니다">자료</Chip> : g.resolved ? <Chip tone="primary" className="h-5 text-xs" title={g.root.resolve_note ? `완료 사유: ${g.root.resolve_note}` : "이어진 해결 로그로 완료"}>완료{g.root.resolve_note && " · 사유 있음"}</Chip> : <Chip tone="warn" className="h-5 text-xs">진행 중</Chip>}
                       <span>기록 {g.total}건</span>
                       <span>·</span>
                       <span>최근 {fmt(g.last)}</span>
@@ -275,13 +290,13 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       </div>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5 max-sm:w-full max-sm:flex-row max-sm:flex-wrap max-sm:items-center max-sm:justify-end">
+                  <div className="flex shrink-0 flex-col items-end gap-1.5 @max-md:w-full @max-md:flex-row @max-md:flex-wrap @max-md:items-center @max-md:justify-end">{/* 카드 폭 기준(좁은 왼쪽 칸·휴대폰): 동작 버튼을 제목 아래 한 줄로 */}
                     {g.root.type === "ref" ? null : g.resolved ? (
                       <Button variant="outline" size="xs" onClick={() => resolve(g.root, false)} title="완료 해제"><Undo2 className="size-3" /> 완료 해제</Button>
                     ) : (
                       <Button variant="outline" size="xs" onClick={() => resolve(g.root, true)} title={g.hasSuccess ? "이 장애 건을 완료 처리" : "해결 로그가 없어 완료 사유를 묻습니다"} className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
                     )}
-                    <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100"><Plus className="size-3" /> 로그 추가</Link>
+                    <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><Plus className="size-3" /> 로그 추가</Link>
                     {g.root.id === entryId && (
                       <div className="flex gap-1.5">
                         <Button variant="outline" size="xs" onClick={() => refine(g.root.id)} disabled={busyId === g.root.id} title="이 기록의 AI 정리만 다시 합니다. 관련 로그 무관"><RefreshCw className={cn("size-3", (g.root.refine_status === "pending" || g.root.refine_status === "processing") && "animate-spin")} /> 다시 정리</Button>
@@ -294,22 +309,22 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                     )}
                   </div>
                 </div>
-                {note?.id === g.root.id && <div className="px-4 pb-3"><NoteBox root={g.root} /></div>}
-                {g.root.id === entryId && ask?.id === g.root.id && <div className="px-4 pb-3"><AskBox id={g.root.id} /></div>}
+                {note?.id === g.root.id && <div className="px-3 pb-3 sm:px-4"><NoteBox root={g.root} /></div>}
+                {g.root.id === entryId && ask?.id === g.root.id && <div className="px-3 pb-3 sm:px-4"><AskBox id={g.root.id} /></div>}
                 {isOpen && (
-                  <ol className="relative mx-4 mb-3 ml-7 border-l border-border pl-5">
+                  <ol className="relative mx-3 mb-3 ml-5 border-l border-border pl-4 sm:mx-4 sm:ml-7 sm:pl-5">
                     {g.nodes.filter((l) => l.id !== g.root.id).map((l) => {
                       const selected = l.id === entryId;
                       const depth = Math.max(0, l.path_label.split(".").length - g.root.path_label.split(".").length - 1);
                       return (
-                        <li key={l.id} ref={(el) => { if (el) cardRefs.current.set(l.id, el); else cardRefs.current.delete(l.id); }} className="relative mb-2.5 last:mb-0" style={{ marginLeft: depth * 18 }}>
-                          <span className={cn("absolute -left-[25px] top-4 size-2.5 rounded-full ring-4 ring-card", dotTone[l.type])} />
+                        <li key={l.id} ref={(el) => { if (el) cardRefs.current.set(l.id, el); else cardRefs.current.delete(l.id); }} className="relative mb-2.5 last:mb-0" style={{ marginLeft: depth * 12 }}>
+                          <span className={cn("absolute -left-[21px] top-4 size-2.5 rounded-full ring-4 ring-card sm:-left-[25px]", dotTone[l.type])} />
                           <div onClick={() => select(l.id)} className={cn("block w-full text-left", g.dim.has(l.id) && "opacity-50")}>
-                            <div className={cn("rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:bg-primary-50", selected && "border-primary-400 bg-primary-50")}>
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex min-w-0 items-center gap-2">
+                            <div className={cn("rounded-lg border border-transparent px-2.5 py-2.5 transition-colors sm:px-3 hover:bg-primary-50", selected && "border-primary-400 bg-primary-50")}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex min-w-0 items-start gap-2">
                                   <TypeBadge type={l.type} />
-                                  <button type="button" onClick={(e) => { e.stopPropagation(); select(l.id); }} className={cn("min-w-0 truncate text-left text-sm font-semibold text-ink", l.status === "deprecated" && "line-through opacity-60")}>{l.title}</button>
+                                  <button type="button" onClick={(e) => { e.stopPropagation(); select(l.id); }} className={cn("min-w-0 line-clamp-2 text-left text-sm font-semibold leading-snug text-ink", l.status === "deprecated" && "line-through opacity-60")}>{l.title}</button>
                                 </div>
                                 <span className="shrink-0 text-xs text-ink-muted">{fmt(l.created_at)}</span>
                               </div>
@@ -324,7 +339,8 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                                     {l.status === "deprecated" && <Chip tone="warn" title={l.deprecate_reason ? `사유: ${l.deprecate_reason}` : undefined}>폐기{l.deprecate_reason && ` · ${l.deprecate_reason}`}</Chip>}
                                   </div>
                                   <div className="flex items-center text-xs text-ink-muted">{l.author_name}
-                                    <Link href={`/w/${wsId}/logs/new?parent=${l.id}`} className="ml-auto inline-flex items-center gap-1 font-medium text-primary-700 hover:underline"><Plus className="size-3" /> 이 로그 아래에 추가</Link>
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); jumpToFlow(); }} className="ml-3 inline-flex items-center gap-1 font-medium text-primary-700 lg:hidden pointer-coarse:min-h-11"><ArrowDown className="size-3" /> 흐름에서 보기</button>
+                                    <Link href={`/w/${wsId}/logs/new?parent=${l.id}`} className="ml-auto inline-flex items-center gap-1 font-medium text-primary-700 hover:underline pointer-coarse:min-h-11"><Plus className="size-3" /> 이 로그 아래에 추가</Link>
                                   </div>
                                   <div className="flex flex-wrap gap-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
                                     <Button variant="outline" size="xs" onClick={() => refine(l.id)} disabled={busyId === l.id || l.refine_status === "processing"} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다. 앞뒤 연결에는 영향 없음">
@@ -365,13 +381,15 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
         </div>
       </section>
 
-      <Card className="min-w-0 p-6 xl:sticky xl:top-24">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
+      <div ref={flowRef} className="min-w-0 scroll-mt-16 lg:sticky lg:top-24">
+      <Card className="min-w-0 p-4 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-2 sm:mb-5">
+          <div className="min-w-0">
             <h2 className="font-bold text-ink">해결 흐름</h2>
-            <p className="mt-0.5 text-sm text-ink-muted">장애 건 › 원인(실패) › 해결(성공)·참고 순서로 이어집니다. 로그를 누르면 관련된 흐름만 밝게 표시됩니다.</p>
+            <p className="mt-0.5 hidden text-sm text-ink-muted sm:block">장애 건 › 원인(실패) › 해결(성공)·참고 순서로 이어집니다. 로그를 누르면 관련된 흐름만 밝게 표시됩니다.</p>
           </div>
-          <div className="flex gap-2">
+          <Button variant="outline" size="xs" className="lg:hidden" onClick={backToList}><ArrowUp className="size-3" /> 목록으로</Button>
+          <div className="hidden gap-2 sm:flex">
             {(["fail", "success", "ref"] as LogType[]).map((t) => (
               <TypeBadge key={t} type={t} />
             ))}
@@ -381,7 +399,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
           <>
             <ChainGraph chain={chain} selectedId={entryId} onSelect={select} />
             {/* FE-012 P1-7: 카드에 새로 붙는 표시의 뜻 */}
-            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-muted">
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
               <span><span className="rounded-full bg-fail px-1.5 text-white">원인</span> 장애 건의 원인으로 표시된 기록</span>
               <span><span className="rounded-full bg-success px-1.5 text-white">해결</span> 장애 건을 해결한 기록</span>
               <span><span className="rounded bg-primary-100 px-1 font-semibold text-primary-700">규정 따름</span>·<span className="rounded bg-warn-bg px-1 font-semibold text-warn">규정 예외</span>·<span className="rounded bg-ref-bg px-1 font-semibold">규정 없음</span> 이 조치가 사내 규정과 어떤 관계인지</span>
@@ -389,7 +407,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
             </p>
             {chain.truncated && <p className="mt-2 text-xs text-warn">기록이 많아 {chain.nodes.length}건만 표시했습니다(전체 {chain.total}건). 왼쪽 목록에서 다른 기록을 눌러 그 주변을 볼 수 있습니다.</p>}
             {chain.summary && (
-              <div className="mt-6 rounded-xl bg-primary-50 p-5">
+              <div className="mt-5 rounded-xl bg-primary-50 p-4 sm:mt-6 sm:p-5">
                 <div className="mb-2 flex items-center gap-3">
                   <Chip tone="dark">AI 요약</Chip>
                   <span className="text-xs text-ink-muted">이 장애 건의 흐름을 한 단락으로</span>
@@ -402,6 +420,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
           <div className="py-16 text-center text-sm text-ink-muted">이 로그에 이어진 원인·해결이 아직 없습니다. &ldquo;로그 추가&rdquo;로 이어 주세요.</div>
         )}
       </Card>
+      </div>
     </main>
   );
 }

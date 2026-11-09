@@ -15,7 +15,7 @@ export function AdminView({ wsId, wsName, members, manageable }: { wsId: number;
   ];
   const [tab, setTab] = useState<Tab>(tabs[0]?.id ?? "members");
   return (
-    <main className="flex flex-1 flex-col gap-6 p-4 md:p-6 xl:p-8">
+    <main className="flex flex-1 flex-col gap-4 p-3 sm:gap-6 md:p-6 xl:p-8">
       <div role="tablist" className="flex gap-1 border-b border-border">
         {tabs.map((t) => (
           <button key={t.id} role="tab" type="button" aria-selected={tab === t.id} onClick={() => setTab(t.id)}

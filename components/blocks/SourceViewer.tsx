@@ -10,10 +10,10 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
 
   return (
     // 오른쪽 패널: 흰 바탕 + 테두리 + 왼쪽 강조선으로 대화 영역과 구분, 스크롤해도 따라오게 sticky
-    <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm">
+    <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between border-b border-border pb-3">
         <h2 className="font-bold text-ink">규정 원문</h2>
-        <Chip tone="primary" className="text-[11px]" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
+        <Chip tone="primary" className="text-xs" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
       </div>
 
       {context && (
