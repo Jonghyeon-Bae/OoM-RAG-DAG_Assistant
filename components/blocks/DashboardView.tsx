@@ -20,6 +20,32 @@ function Kpi({ label, value, sub, subTone = "neutral", sample = false }: { label
   );
 }
 
+// FE-012 P1-10: 검색 품질 실측 (백엔드 eval/hit_at_k.py --record 최신 행). 평가셋의 정답 조문·사례가 상위 5 안에 드는 비율
+const kindLabel = { policy: "규정 질문", troubleshoot: "사례 질문" } as const;
+function RetrievalCard({ r }: { r: DashboardSummary["retrieval"] }) {
+  if (!r) return <Card className="flex-row items-center gap-3 p-4 text-sm text-ink-muted"><Chip>검색 정확도</Chip>측정 전입니다. 평가 실행 후 표시됩니다.</Card>;
+  const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
+  return (
+    <Card className="gap-3 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="font-bold text-ink">검색 정확도</h2>
+          <span className="text-xs text-ink-muted">평가 질문 {r.n_samples}건 중 정답 근거가 상위 5개 안에 든 비율</span>
+        </div>
+        <span className="text-[11px] text-ink-muted" title={[r.embedding_model, r.dataset_version, r.mode].filter(Boolean).join(" · ")}>측정 {fmtAt(r.run_at)}</span>
+      </div>
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        <div><div className="text-3xl font-bold tracking-tight text-ink">{pct(r.hit_at_5)}</div><div className="text-xs text-ink-muted">전체</div></div>
+        {(["policy", "troubleshoot"] as const).map((k) => {
+          const b = r.by_kind?.[k];
+          return b ? <div key={k}><div className="text-xl font-semibold text-ink">{b.hit}<span className="text-sm text-ink-muted"> / {b.n}</span></div><div className="text-xs text-ink-muted">{kindLabel[k]}</div></div> : null;
+        })}
+        {r.mrr != null && <div title="정답이 평균 몇 번째에 오는지의 역수. 1에 가까울수록 정답이 맨 위"><div className="text-xl font-semibold text-ink">{r.mrr.toFixed(2)}</div><div className="text-xs text-ink-muted">MRR</div></div>}
+      </div>
+    </Card>
+  );
+}
+
 // B-51: 유형별 탐색 시간 before/after 막대 (CSS). 축은 공통 최대값 기준.
 function CompareBars({ rows }: { rows: NonNullable<DashboardSummary["search_time"]>["by_intent"] }) {
   const max = Math.max(...rows.flatMap((r) => [r.before_min, r.after_min]), 1);
@@ -60,6 +86,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
         <Kpi label="Answer Relevance" value={fmt(ev.answer_relevance)} sub="질문에 맞는 답인지" sample={data.is_sample} />
         <Kpi label="등록된 업무 로그" value={`${logs.total}건`} sub={`이번 주 +${logs.week}`} subTone="primary" />
       </div>
+      <RetrievalCard r={data.retrieval} />
 
       {/* R-24 2차: 이용 현황 — 세션·로그 실시간 집계 (UX-002 1~3) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

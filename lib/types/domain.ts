@@ -3,10 +3,16 @@ export type LogType = "fail" | "success" | "ref";
 export type LogStatus = "active" | "deprecated";
 export type RefineStatus = "pending" | "processing" | "done" | "failed";
 
+// GET /workspaces (WorkspaceController.WorkspaceDto). 규정·사례 두 스위치로 모드가 정해진다(FE-012 §0)
+export type WorkspaceKind = "company" | "dept"; // company = 전사 공통(규정만), dept = 부서
 export interface Workspace {
   id: number;
   name: string;
   policy_enabled: boolean;
+  case_enabled: boolean; // false 면 사례(타임라인·등록) 미사용
+  parent_id: number | null; // 부서 → 소속 회사 전사 공통 ws
+  kind: WorkspaceKind;
+  suggestions: string[]; // 부서별 추천 질문(서버 settings). 비면 추천 칩을 숨긴다
 }
 
 export interface User {
@@ -35,6 +41,9 @@ export interface LogNode {
   resolve_note: string | null; // 성공 로그 없이 완료할 때 필수 사유 (UX-003 D1)
   deprecate_reason: string | null; // 폐기 사유. 연쇄 폐기된 하위에도 같은 사유 (UX-003 D3)
   root_id: number; // 소속 장애 건의 루트 노드 id (서버 계산)
+  depth: number | null;
+  category: "cause" | null; // 장애 건의 원인으로 표시한 기록
+  tags: string[];
   created_at: string;
 }
 
@@ -54,18 +63,36 @@ export interface ChainNode {
   path_label: string;
   note: string | null; // 발생 횟수·적용 결과 등 부가 문구
   last_confirmed_at: string | null;
+  policy_refs: NodePolicyRef[]; // 이 기록이 근거로 삼은 조문(따름·예외·기준 없음)
+  resolves_root: boolean; // 장애 건을 해결한 기록
+  is_cause: boolean; // 장애 건의 원인으로 표시한 기록
 }
+
+export interface ChainEdge { parent_id: number; child_id: number; reason: string | null } // reason = 이 상위에 이어 붙인 이유
 
 export interface Chain {
   entry_id: number;
   nodes: ChainNode[];
-  edges: { parent_id: number; child_id: number }[];
+  edges: ChainEdge[];
   summary: string | null;
+  total: number;
+  truncated: boolean;
+}
+
+// 사례 ↔ 규정 조문 관계 (PolicyRefService.RefView). follows 따름 / exception 예외 / gap 기준 없음
+export type PolicyRelation = "follows" | "exception" | "gap";
+export interface NodePolicyRef {
+  relation: PolicyRelation;
+  policy: string | null; article: string | null; note: string | null; topic: string | null;
+  doc_title: string | null; article_label: string | null;
+  revision: string | null; from_label: string | null; // 개정으로 바뀐 조문이면 개정판·이전 표기
+  suggested_policy?: string | null; suggested_article?: string | null; suggested_label?: string | null;
 }
 
 export interface PolicyRef {
   ref: string; chunk_id: string; doc_id: number; doc_title: string; version: string;
-  article_label: string; page: number; text: string;
+  article_label: string; page: number | null; text: string;
+  source?: "search" | "case"; // case = 사례가 근거로 삼은 조문이라 함께 실림
 }
 
 // ── SSE 이벤트 (04 §4.3). Pydantic → gen_sse_types.py 생성본이 생기면 교체 ──
@@ -74,11 +101,14 @@ export type Mode = "policy" | "dag_only";
 export type StageNode = "supervisor" | "policy_rag" | "graph_search" | "gate" | "generate" | "critic";
 export type StageStatus = "start" | "done" | "error";
 
+// SSE NodePolicy (sse_events.schema.json): REST RefView 의 축약형
+export interface ChainEventPolicy { relation: PolicyRelation; ref?: string | null; label?: string | null; note?: string | null; topic?: string | null; revision?: string | null; from_version?: string | null }
 export interface ChainEventNode {
   ref: string; id: number; type: LogType; status: LogStatus; title: string;
-  depth: number; path_label: string; last_confirmed_at: string | null;
+  depth: number; path_label: string | null; last_confirmed_at: string | null;
+  policy?: ChainEventPolicy[] | null; resolves_root?: boolean; is_cause?: boolean;
 }
-export interface ChainEvent { entry_id: number; nodes: ChainEventNode[]; edges: { parent_id: number; child_id: number }[] }
+export interface ChainEvent { entry_id: number; nodes: ChainEventNode[]; edges: ChainEdge[] }
 export interface CitationsEvent { verified: string[]; unverified: string[] }
 export interface DoneEvent {
   intent: Intent; retrieved_ids: string[]; verified_ids: string[]; unverified_ids: string[];
@@ -132,6 +162,13 @@ export interface DashboardSummary {
   no_evidence: { rate: number | null; recent: { session_id: number; query: string; intent: Intent; created_at: string }[] }; // 근거 없음 = verified 0건
   resolve_time: { median_hours: number | null; sample: number }; // 완료된 장애 건: created_at → resolved_at
   reused: { node_id: number; title: string; type: LogType; author_name: string; count: number }[]; // 인용 횟수 Top 5
+  // 검색 품질 실측(eval/hit_at_k.py --record 최신 행). 측정 전이면 null
+  retrieval: {
+    hit_at_5: number; n_samples: number; mode: string; mrr: number | null; // hit_at_5 = 비율 0~1
+    by_kind: Partial<Record<"policy" | "troubleshoot", { hit: number; n: number }>> | null; // hit = 상위 5 안에 정답이 든 질의 수
+    embedding_model: string | null;
+    dataset_version: string | null; run_at: string;
+  } | null;
 }
 
 export type DocStatus = "active" | "retired";
@@ -185,7 +222,7 @@ export interface Me {
   title: string | null;
   email: string | null;
   workspace_id: number | null;
-  workspaces: { id: number; name: string; policy_enabled: boolean; role: string }[];
+  workspaces: { id: number; name: string; policy_enabled: boolean; case_enabled: boolean; role: string; can_configure: boolean }[];
   must_change_password: boolean;
   consent_required: boolean;
   password_expires_at: string | null;

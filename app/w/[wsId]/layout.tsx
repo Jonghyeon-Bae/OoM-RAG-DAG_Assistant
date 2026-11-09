@@ -25,7 +25,7 @@ export default async function WorkspaceLayout({
   if (!ws) notFound();
   return (
     <div className="flex min-h-screen flex-1 flex-col md:flex-row">
-      <Sidebar wsId={ws.id} policyEnabled={ws.policy_enabled} />
+      <Sidebar wsId={ws.id} policyEnabled={ws.policy_enabled} caseEnabled={ws.case_enabled} />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );

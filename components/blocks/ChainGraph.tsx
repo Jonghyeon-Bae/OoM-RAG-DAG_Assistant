@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Chain, ChainNode } from "@/lib/types/domain";
-import { ChainNodeCard } from "@/components/blocks/ChainBlock";
+import { ChainNodeCard, reasonsByChild } from "@/components/blocks/ChainBlock";
 import { cn } from "@/lib/utils";
 
 // B-44 (xyflow 도입 전 폴백): 깊이별 열 배치 + 실제 간선을 SVG로 그린다.
@@ -29,6 +29,7 @@ function orderByParent(chain: Chain): ChainNode[][] {
 
 export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; selectedId?: number; onSelect?: (id: number) => void }) {
   const cols = useMemo(() => orderByParent(chain), [chain]);
+  const reasons = useMemo(() => reasonsByChild(chain), [chain]);
   const wrap = useRef<HTMLDivElement>(null);
   const refs = useRef(new Map<number, HTMLDivElement>());
   const [boxes, setBoxes] = useState<Map<number, Box>>(new Map());
@@ -93,7 +94,7 @@ export function ChainGraph({ chain, selectedId, onSelect }: { chain: Chain; sele
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect?.(n.id)}
                   className={cn("transition-opacity", dim && "opacity-30")}
                 >
-                  <ChainNodeCard node={n} selected={n.id === selectedId} />
+                  <ChainNodeCard node={n} selected={n.id === selectedId} reasons={reasons.get(n.id)} />
                 </div>
               );
             })}

@@ -6,6 +6,7 @@ import { Chip } from "@/components/ui";
 import { getWorkspaces } from "@/lib/api";
 import { peekCurrentUser } from "@/lib/api/session";
 import { nextPathFor } from "@/lib/api/auth";
+import { modeOf, modeLabel, modeTone } from "@/lib/mode";
 
 // 대문: 서비스 소개. 로그인된 사용자는 HTML 을 내기 전에 내 워크스페이스로 보낸다(점멸 없음). 로그인은 /login
 export default async function HomePage() {
@@ -38,7 +39,7 @@ export default async function HomePage() {
             {workspaces.map((ws) => (
               <li key={ws.id} className="flex items-center justify-between rounded-lg border border-border bg-primary-50 px-3 py-2.5">
                 <span className="text-sm text-ink">{ws.name}</span>
-                <Chip tone={ws.policy_enabled ? "primary" : "neutral"} className="h-5 text-[11px]">{ws.policy_enabled ? "규정 + 해결 사례" : "해결 사례만"}</Chip>
+                <Chip tone={modeTone(modeOf(ws))} className="h-5 text-[11px]">{modeLabel[modeOf(ws)]}</Chip>
               </li>
             ))}
             {workspaces.length === 0 && <li className="text-xs text-fail">서버에 연결할 수 없습니다. 백엔드가 켜져 있는지 확인해 주세요.</li>}

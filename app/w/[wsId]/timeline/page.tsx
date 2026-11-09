@@ -3,6 +3,7 @@ import { Header } from "@/components/shell/Header";
 import { TimelineView } from "@/components/blocks/TimelineView";
 import { getLogs, getChain } from "@/lib/api";
 import { resolveWs } from "@/lib/ws";
+import { CaseOff } from "@/components/shell/CaseOff";
 
 async function TimelineContent({
   params,
@@ -12,6 +13,7 @@ async function TimelineContent({
   searchParams: Promise<{ entry?: string; resolved?: string }>;
 }) {
   const ws = await resolveWs(params);
+  if (!ws.case_enabled) return (<><Header title="트러블슈팅 타임라인" subtitle="장애 건마다 원인과 해결을 순서대로 모아 보여줍니다" ws={ws} /><CaseOff wsId={ws.id} /></>);
   const sp = await searchParams;
   const { items } = await getLogs(ws.id);
   // 기본 선택은 최신 로그가 아니라 최근 활동이 있는 장애 건(루트) — 흐름 그래프가 가지 하나만 보이지 않게 (UX-003 B4)

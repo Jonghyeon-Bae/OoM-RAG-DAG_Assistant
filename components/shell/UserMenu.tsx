@@ -7,6 +7,7 @@ import { Avatar, Chip, cn } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/api/auth";
 import type { Me } from "@/lib/types/domain";
+import { modeOf, modeShort, modeTone } from "@/lib/mode";
 
 // 헤더 우측: 아바타 + 현재 워크스페이스 ▾ → 소속 워크스페이스 전환(현재 섹션 유지) · 로그아웃 (작업지시 B-3 / FE-008 §1 E)
 export function UserMenu({ me, wsId }: { me: Me; wsId: number }) {
@@ -41,7 +42,7 @@ export function UserMenu({ me, wsId }: { me: Me; wsId: number }) {
                 <Link role="menuitem" href={`/w/${w.id}/${section}`} onClick={() => setOpen(false)} className={cn("flex items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-primary-50", w.id === wsId && "bg-primary-50")}>
                   <Check className={cn("size-3.5", w.id === wsId ? "text-primary-700" : "opacity-0")} />
                   <span className="min-w-0 flex-1 truncate text-ink">{w.name}</span>
-                  <Chip tone={w.policy_enabled ? "primary" : "neutral"} className="h-5 text-[10px]">{w.policy_enabled ? "규정 + 사례" : "사례만"}</Chip>
+                  <Chip tone={modeTone(modeOf(w))} className="h-5 text-[10px]">{modeShort[modeOf(w)]}</Chip>
                 </Link>
               </li>
             ))}

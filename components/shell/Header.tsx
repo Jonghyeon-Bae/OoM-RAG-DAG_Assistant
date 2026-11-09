@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Chip, Avatar } from "@/components/ui";
 import { getCurrentUser } from "@/lib/api/session";
 import { UserMenu } from "@/components/shell/UserMenu";
+import { modeOf, modeLabel, modeTone } from "@/lib/mode";
 import type { Workspace } from "@/lib/types/domain";
 
 export function Header({
@@ -23,7 +24,7 @@ export function Header({
       </div>
       <div className="flex items-center gap-2 md:gap-3">
         <Chip tone="primary" className="hidden sm:inline-flex">{ws.name}</Chip>
-        <Chip tone={ws.policy_enabled ? "primary" : "neutral"} className="hidden lg:inline-flex">{ws.policy_enabled ? "규정 + 해결 사례" : "해결 사례만"}</Chip>
+        <Chip tone={modeTone(modeOf(ws))} className="hidden lg:inline-flex">{modeLabel[modeOf(ws)]}</Chip>
         {right}
         <Suspense fallback={<Avatar name="·" />}><UserAvatar wsId={ws.id} /></Suspense>
       </div>

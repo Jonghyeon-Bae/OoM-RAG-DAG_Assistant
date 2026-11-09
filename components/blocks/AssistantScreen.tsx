@@ -9,6 +9,7 @@ import { Chip, cn } from "@/components/ui";
 import { ChainBlock } from "@/components/blocks/ChainBlock";
 import { SourceViewer } from "@/components/blocks/SourceViewer";
 import { fetchSessions, patchSessionScore, streamChat } from "@/lib/api/client";
+import { modeOf, type WsMode } from "@/lib/mode";
 import type { Chain, ChainEvent, ChatEvent, CitationsEvent, DoneEvent, Intent, Mode, PolicyRef, SearchSession, StageNode, StageStatus, Workspace } from "@/lib/types/domain";
 
 // ── 한 질의(턴)의 상태: SSE 이벤트 9종이 차례로 채운다. 실서버에서는 턴 1개 = search_sessions 1행 ──
@@ -102,11 +103,27 @@ const stageLabel: { node: StageNode; label: string; hint: string }[] = [
 const intentLabel: Record<Intent, string> = { policy: "규정 확인", troubleshoot: "장애 해결", both: "규정 + 해결 사례" };
 // 실서버 stage detail 코드 → 표시 문구 (근거 없음은 gate 의 detail "no_evidence")
 const detailLabel: Record<string, string> = { no_evidence: "근거 없음" };
-// B-11 추천 질문: 워크스페이스 모드별 정적 3개. 실서버 전환 후에도 정적 유지(검색 내역 기반 추천은 R-목록)
-const suggestions = (policy: boolean): string[] =>
-  policy
-    ? ["외근 중 VPN 접속하면 E-403이 떠요. 왜 그런가요?", "원격접속 신청 기간은 최대 며칠인가요?", "접속이 차단되면 어디서 확인하나요?"]
-    : ["VPN E-403이 반복돼요. 해결한 사례 있나요?", "게이트웨이 시간이 어긋나서 토큰이 만료되는 것 같아요", "FAQ 연동 API 504 타임아웃 원인이 뭐였나요?"];
+// 추천 질문은 서버 workspace.suggestions(부서별). 고정 문구는 그 부서에 근거가 없는 질문을 띄운다 (FE-012 P0-2)
+// 모드별 안내·입력 힌트 (lib/mode 의 모드 3종)
+const modeIntro: Record<WsMode, string> = {
+  both: "규정 근거와 과거 장애 해결 사례를 한 번에 물어보세요.",
+  policy: "이 워크스페이스는 규정만 검색합니다. 규정·절차를 물어보세요.",
+  case: "이 워크스페이스는 해결 사례만 검색합니다. 겪고 있는 오류나 증상을 물어보세요.",
+};
+const modeHint: Record<WsMode, string> = {
+  both: "규정이나 과거 장애 해결 사례를 물어보세요",
+  policy: "규정·절차를 물어보세요",
+  case: "겪고 있는 오류나 증상을 적어 보세요",
+};
+// SSE chain 이벤트 → REST Chain 모양(ChainBlock 공용). SSE NodePolicy 는 RefView 의 축약형이라 표시 필드만 옮긴다
+const chainFromEvent = (e: ChainEvent): Chain => ({
+  entry_id: e.entry_id, edges: e.edges.map((x) => ({ ...x, reason: x.reason ?? null })), summary: null, total: e.nodes.length, truncated: false,
+  nodes: e.nodes.map((n) => ({
+    id: n.id, type: n.type, status: n.status, title: n.title, depth: n.depth, path_label: n.path_label ?? "", note: null, last_confirmed_at: n.last_confirmed_at,
+    resolves_root: !!n.resolves_root, is_cause: !!n.is_cause,
+    policy_refs: (n.policy ?? []).map((p) => ({ relation: p.relation, policy: null, article: null, note: p.note ?? null, topic: p.topic ?? null, doc_title: null, article_label: p.label ?? null, revision: p.revision ?? null, from_label: p.from_version ?? null })),
+  })),
+});
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
 export function AssistantScreen({ ws }: { ws: Workspace }) {
@@ -120,7 +137,8 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   const listRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true); // 사용자가 위로 올려 읽는 중이면 자동 스크롤을 멈춘다
-  const policyMode = ws.policy_enabled;
+  const policyMode = ws.policy_enabled; // 규정 원문 패널 유무
+  const mode = modeOf(ws);
   const current = state.turns[state.turns.length - 1];
   const streaming = current?.status === "streaming";
   const storageKey = `oom.chat.${ws.id}`;
@@ -219,9 +237,9 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
         <div ref={listRef} onScroll={onListScroll} className="flex flex-1 flex-col gap-4 md:min-h-0 md:overflow-y-auto md:pr-1">
           {state.turns.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center text-sm text-ink-muted">
-              <p className="font-medium text-ink">{policyMode ? "규정 근거와 과거 장애 해결 사례를 한 번에 물어보세요." : "이 워크스페이스는 해결 사례만 검색합니다. 겪고 있는 오류나 증상을 물어보세요."}</p>
+              <p className="font-medium text-ink">{modeIntro[mode]}</p>
               <div className="mt-1 flex flex-wrap justify-center gap-2">
-                {suggestions(policyMode).map((q) => (
+                {ws.suggestions.map((q) => (
                   <button key={q} type="button" onClick={() => ask(q)} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-ink hover:bg-primary-50">{q}</button>
                 ))}
               </div>
@@ -258,7 +276,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
 
         <div className="sticky bottom-0 mt-4 bg-background pb-2 pt-2 md:static">
           <form className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2 pl-5 shadow-sm" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
-            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={policyMode ? "규정이나 과거 장애 해결 사례를 물어보세요" : "겪고 있는 오류나 증상을 적어 보세요"} className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" disabled={streaming} />
+            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={modeHint[mode]} className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" disabled={streaming} />
             {streaming ? (
               <Button type="button" variant="outline" size="lg" className="size-11 rounded-full p-0" onClick={stop} aria-label="중지"><Square className="size-4" /></Button>
             ) : (
@@ -338,9 +356,7 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
   const [open, setOpen] = useState(!collapsed);
   const c = turn.citations;
   const tone = (ref: string) => (!c ? "neutral" : c.verified.includes(ref) ? "primary" : c.unverified.includes(ref) ? "warn" : "neutral");
-  const chain: Chain | null = turn.chain
-    ? { entry_id: turn.chain.entry_id, edges: turn.chain.edges, summary: null, nodes: turn.chain.nodes.map((n) => ({ ...n, note: null })) }
-    : null;
+  const chain: Chain | null = turn.chain ? chainFromEvent(turn.chain) : null;
   // 마커 설명: [P1] → 규정 조항, [N1] → 해결 흐름의 기록. 툴팁에 실제 제목을 보여준다
   const describe = (ref: string) => {
     if (ref.startsWith("P")) { const p = turn.policy.find((x) => x.ref === ref); return p ? `규정 ${ref.slice(1)}: ${p.doc_title} ${p.version} ${p.article_label}` : `규정 조항 ${ref.slice(1)}`; }

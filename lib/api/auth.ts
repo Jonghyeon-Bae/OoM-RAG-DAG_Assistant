@@ -42,6 +42,8 @@ export async function me(): Promise<Me | null> {
 
 export async function logout(): Promise<void> {
   try { await api.post("/auth/logout"); } catch { /* 이미 만료된 세션이어도 첫 화면으로 간다 */ }
+  // 의도적 전체 새로고침: 로그아웃 뒤 클라이언트 상태(검색 내역·대화 캐시)를 메모리에서 지운다
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   if (typeof window !== "undefined") window.location.assign("/login");
 }
 
@@ -64,6 +66,11 @@ export async function changePassword(current: string, next: string): Promise<{ o
 /** 공개 API. 로그인·변경 화면 안내문 */
 export async function passwordPolicy(): Promise<PasswordPolicy | null> {
   try { const { data } = await api.get<PasswordPolicy>("/auth/password-policy"); return data; } catch { return null; }
+}
+
+/** 개인정보 처리방침 문안(markdown). 공개 API. 서버 파일이 없으면 404 → null (운영은 data/legal 마운트 필요) */
+export async function privacyPolicy(): Promise<string | null> {
+  try { const { data } = await api.get<string>("/auth/privacy-policy", { responseType: "text", transformResponse: (x) => x }); return data; } catch { return null; }
 }
 
 /** 로그인 뒤 어디로 가는지 한 곳에서 결정 (FE-008 §1 B·D 공용) */

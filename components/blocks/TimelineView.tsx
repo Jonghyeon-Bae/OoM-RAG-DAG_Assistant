@@ -380,13 +380,23 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
         {chain ? (
           <>
             <ChainGraph chain={chain} selectedId={entryId} onSelect={select} />
-            <div className="mt-6 rounded-xl bg-primary-50 p-5">
-              <div className="mb-2 flex items-center gap-3">
-                <Chip tone="dark">AI 요약</Chip>
-                <span className="text-xs text-ink-muted">이 장애 건의 흐름을 한 단락으로</span>
+            {/* FE-012 P1-7: 카드에 새로 붙는 표시의 뜻 */}
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-muted">
+              <span><span className="rounded-full bg-fail px-1.5 text-white">원인</span> 장애 건의 원인으로 표시된 기록</span>
+              <span><span className="rounded-full bg-success px-1.5 text-white">해결</span> 장애 건을 해결한 기록</span>
+              <span><span className="rounded bg-primary-100 px-1 font-semibold text-primary-700">규정 따름</span>·<span className="rounded bg-warn-bg px-1 font-semibold text-warn">규정 예외</span>·<span className="rounded bg-ref-bg px-1 font-semibold">규정 없음</span> 이 조치가 사내 규정과 어떤 관계인지</span>
+              <span>↳ 기울임 글씨 = 앞 기록에 이어 붙인 이유</span>
+            </p>
+            {chain.truncated && <p className="mt-2 text-xs text-warn">기록이 많아 {chain.nodes.length}건만 표시했습니다(전체 {chain.total}건). 왼쪽 목록에서 다른 기록을 눌러 그 주변을 볼 수 있습니다.</p>}
+            {chain.summary && (
+              <div className="mt-6 rounded-xl bg-primary-50 p-5">
+                <div className="mb-2 flex items-center gap-3">
+                  <Chip tone="dark">AI 요약</Chip>
+                  <span className="text-xs text-ink-muted">이 장애 건의 흐름을 한 단락으로</span>
+                </div>
+                <p className="text-sm leading-relaxed text-ink">{chain.summary}</p>
               </div>
-              <p className="text-sm leading-relaxed text-ink">{chain.summary}</p>
-            </div>
+            )}
           </>
         ) : (
           <div className="py-16 text-center text-sm text-ink-muted">이 로그에 이어진 원인·해결이 아직 없습니다. &ldquo;로그 추가&rdquo;로 이어 주세요.</div>

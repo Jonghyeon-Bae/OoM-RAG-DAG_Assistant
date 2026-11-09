@@ -3,15 +3,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const nav = [
+// policyOnly = 규정 사용 부서만, caseOnly = 사례 사용 부서만 (FE-012 P0-3, D-1 기본안: 비활성 + 이유 표시)
+const nav: { href: string; label: string; policyOnly?: boolean; caseOnly?: boolean; pending?: boolean }[] = [
   { href: "assistant", label: "AI 어시스턴트" },
-  { href: "timeline", label: "트러블슈팅 타임라인" },
-  { href: "logs/new", label: "업무로그 등록" },
+  { href: "timeline", label: "트러블슈팅 타임라인", caseOnly: true },
+  { href: "logs/new", label: "업무로그 등록", caseOnly: true },
   { href: "dashboard", label: "성과 대시보드" },
-  { href: "documents", label: "규정 문서 관리", policyOnly: true, pending: true }, // API 게이트(11/06) 뒤
+  { href: "documents", label: "규정 문서 관리", policyOnly: true, pending: true }, // 백엔드 문서 API 미구현(FE-012 §0)
 ];
 
-export function Sidebar({ wsId, policyEnabled }: { wsId: number; policyEnabled: boolean }) {
+export function Sidebar({ wsId, policyEnabled, caseEnabled }: { wsId: number; policyEnabled: boolean; caseEnabled: boolean }) {
   const pathname = usePathname();
   return (
     <aside className="sticky top-0 z-40 flex shrink-0 flex-col border-b border-border bg-sidebar md:h-screen md:w-60 md:border-b-0 md:border-r">
@@ -23,16 +24,19 @@ export function Sidebar({ wsId, policyEnabled }: { wsId: number; policyEnabled: 
         {nav.map((item) => {
           const href = `/w/${wsId}/${item.href}`;
           const active = pathname.startsWith(href);
-          const disabled = item.pending || (item.policyOnly && !policyEnabled);
+          const why = item.pending ? "준비 중입니다" : item.policyOnly && !policyEnabled ? "이 워크스페이스는 규정을 쓰지 않습니다" : item.caseOnly && !caseEnabled ? "이 워크스페이스는 해결 사례를 쓰지 않습니다" : null;
+          const disabled = why !== null;
           return (
             <Link
               key={item.href}
               href={disabled ? "#" : href}
               aria-disabled={disabled}
+              title={why ?? undefined}
+              onClick={disabled ? (e) => e.preventDefault() : undefined}
               className={cn(
                 "flex h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-medium transition-colors md:h-12 md:gap-3 md:px-4",
                 active ? "bg-primary-700 text-white" : "text-ink hover:bg-primary-100",
-                disabled && "pointer-events-none opacity-40",
+                disabled && "cursor-not-allowed opacity-40 hover:bg-transparent",
               )}
             >
               <span className={cn("size-2 rounded-full", active ? "bg-primary-200" : "bg-primary-400")} />
