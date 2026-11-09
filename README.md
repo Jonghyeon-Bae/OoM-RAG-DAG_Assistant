@@ -14,6 +14,11 @@ pnpm dev
 bun dev
 ```
 
+docker build는 아래와 같이 진행.
+
+docker build --build-arg API_ORIGIN=http://host.docker.internal:8080 -t oom-web:local .
+docker run --rm -p 3000:3000 -e API_ORIGIN=http://host.docker.internal:8080 oom-web:local
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
