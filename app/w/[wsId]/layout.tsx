@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getWorkspace } from "@/lib/api";
-import { getCurrentUser } from "@/lib/api/session";
+import { requireWorkspace } from "@/lib/guard";
 import { accessOf } from "@/lib/access";
 import { Sidebar } from "@/components/shell/Sidebar";
 
@@ -12,16 +12,10 @@ export default async function WorkspaceLayout({
   params: Promise<{ wsId: string }>;
 }) {
   const { wsId } = await params;
-  // 접근 가드 (FE-008 §1 D): 로그인 없음 → server.ts 가 "/login" 으로. 게이트 미통과 → 게이트. 소속 아님 → 내 첫 워크스페이스
-  const me = await getCurrentUser();
-  if (me.consent_required) redirect("/gate/consent");
-  if (me.must_change_password) redirect("/gate/password");
+  // 첫 진입 가드. 같은 부서 안에서 페이지를 옮길 때는 레이아웃이 다시 돌지 않으므로 페이지(resolveWs)도 같은 가드를 돈다 (#093)
+  // 사이드바의 관리자 메뉴는 첫 진입 때 값 — 역할이 바뀌면 다음 전체 진입 때 반영. 관리자 페이지 자체가 권한을 다시 본다
   const id = Number(wsId);
-  if (!me.workspaces.some((w) => w.id === id)) {
-    const home = me.workspace_id ?? me.workspaces[0]?.id;
-    if (!home) redirect("/gate/no-workspace");
-    redirect(`/w/${home}/timeline`);
-  }
+  const me = await requireWorkspace(id);
   const ws = await getWorkspace(id);
   if (!ws) notFound();
   return (

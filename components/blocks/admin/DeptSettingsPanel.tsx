@@ -21,7 +21,7 @@ export function DeptSettingsPanel({ initial }: { initial: ManageableWorkspace[] 
     setBusy(null);
     if (!r.ok) { setMsg({ id: w.id, text: r.message, ok: false }); return; }
     setRows((rs) => rs.map((x) => (x.id === w.id ? { ...x, policy_enabled: r.data.policy_enabled, case_enabled: r.data.case_enabled } : x)));
-    setMsg({ id: w.id, text: `${modeLabel[modeOf(r.data)]}(으)로 바꿨습니다`, ok: true });
+    setMsg({ id: w.id, text: `바꿨습니다 — 지금 설정: ${modeLabel[modeOf(r.data)]}`, ok: true });
     router.refresh();
   };
   // 렌더 함수(컴포넌트 아님) — 렌더마다 새 컴포넌트가 되어 포커스가 튀는 것을 막는다 (#058 과 같은 이유)
@@ -30,7 +30,7 @@ export function DeptSettingsPanel({ initial }: { initial: ManageableWorkspace[] 
     const last = on && !(k === "policy_enabled" ? w.case_enabled : w.policy_enabled); // 이걸 끄면 둘 다 꺼짐
     return (
       <label key={k} className="flex items-center gap-2 text-sm" title={last ? "규정과 해결 사례를 모두 끌 수는 없습니다" : hint}>
-        <button type="button" role="switch" aria-checked={on} disabled={last || busy !== null} onClick={() => toggle(w, k)}
+        <button type="button" role="switch" aria-checked={on} aria-label={`${w.name} ${label}`} disabled={last || busy !== null} onClick={() => toggle(w, k)}
           className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? "bg-primary-700" : "bg-ref-bg"}`}>
           <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
         </button>

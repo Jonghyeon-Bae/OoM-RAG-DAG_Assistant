@@ -12,7 +12,8 @@ import { modeOf, modeLabel, modeTone } from "@/lib/mode";
 export default async function HomePage() {
   const me = await peekCurrentUser();
   if (me) redirect(nextPathFor(me));
-  const workspaces = await getWorkspaces().catch(() => []);
+  // null = 서버 연결 실패, [] = 백엔드가 로그인 전 공개할 데모 회사를 설정하지 않음(oom.public-tenant) — 이때는 섹션을 숨긴다 (#093)
+  const workspaces = await getWorkspaces().catch(() => null);
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <Card className="w-full max-w-3xl p-8 md:p-12">
@@ -32,6 +33,9 @@ export default async function HomePage() {
           <Feature icon={<Gauge className="size-5" />} title="빈 곳이 보인다" body="근거 없이 끝난 질문과 자주 쓰인 기록을 대시보드에서 봅니다. 다음에 무엇을 남길지 알 수 있습니다." />
         </dl>
 
+        {workspaces === null ? (
+          <p className="mt-10 text-xs text-fail">서버에 연결할 수 없습니다. 백엔드가 켜져 있는지 확인해 주세요.</p>
+        ) : workspaces.length > 0 && (
         <section className="mt-10">
           <h2 className="text-sm font-semibold text-ink">워크스페이스</h2>
           <p className="mt-1 text-xs text-ink-muted">부서 단위 작업 공간입니다. 로그인하면 내 소속 워크스페이스로 들어갑니다.</p>
@@ -42,9 +46,9 @@ export default async function HomePage() {
                 <Chip tone={modeTone(modeOf(ws))} className="h-5 text-[11px]">{modeLabel[modeOf(ws)]}</Chip>
               </li>
             ))}
-            {workspaces.length === 0 && <li className="text-xs text-fail">서버에 연결할 수 없습니다. 백엔드가 켜져 있는지 확인해 주세요.</li>}
           </ul>
         </section>
+        )}
       </Card>
     </main>
   );
