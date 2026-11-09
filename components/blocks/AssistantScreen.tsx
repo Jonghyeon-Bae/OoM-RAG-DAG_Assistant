@@ -421,7 +421,7 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
         <div className="mt-3 flex flex-wrap gap-2">
           {turn.policy.map((p) => (
             <button key={p.chunk_id} type="button" onClick={() => onCite(p.ref)} className={cn("rounded-full border px-3 py-1 text-xs transition-colors", c?.verified.includes(p.ref) ? "border-primary-400 bg-primary-50 text-primary-700" : "border-border text-ink-muted")}>
-              규정 {p.ref.slice(1)} · {p.doc_title} {p.version} · {p.article_label.split(" ")[0]} · p.{p.page}
+              규정 {p.ref.slice(1)} · {p.doc_title} {p.version} · {p.article_label.split(" ")[0]}{p.page != null && ` · p.${p.page}`}
             </button>
           ))}
         </div>

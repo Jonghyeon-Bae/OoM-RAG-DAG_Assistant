@@ -28,8 +28,9 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
         <>
           <div className="flex flex-wrap gap-2">
             {sources.map((s) => (
-              <button key={s.ref} type="button" onClick={() => onSelect(s.ref)} className={cn("rounded-full px-3 py-1.5 text-xs font-medium transition-colors", s.ref === active?.ref ? "bg-primary-700 text-white" : "bg-ref-bg text-ref hover:bg-primary-100")}>
-                규정 {s.ref.slice(1)} · {s.doc_title.split("·")[0]} p.{s.page}
+              // 제목을 "·"로 자르지 않는다 — 새 규정 제목에 "·"가 들어 있어("배포·장애 대응 운영지침") 앞 단어만 남았다(#098). 길면 말줄임 + 툴팁
+              <button key={s.ref} type="button" onClick={() => onSelect(s.ref)} title={`${s.doc_title} ${s.article_label}`} className={cn("max-w-full truncate rounded-full px-3 py-1.5 text-xs font-medium transition-colors", s.ref === active?.ref ? "bg-primary-700 text-white" : "bg-ref-bg text-ref hover:bg-primary-100")}>
+                규정 {s.ref.slice(1)} · {s.doc_title}{s.page != null && ` p.${s.page}`}
               </button>
             ))}
           </div>
@@ -43,7 +44,7 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
                   <p key={i} className="rounded-lg bg-primary-50 px-3 py-2.5 text-sm leading-relaxed text-ink">{c}</p>
                 ))}
               </div>
-              <div className="text-xs text-ink-muted">p.{active.page}</div>
+              {active.page != null && <div className="text-xs text-ink-muted">p.{active.page}</div>}
             </div>
           )}
           {/* TODO Tier 2: GET /api/documents/{doc_id}/file → react-pdf 모달 */}
