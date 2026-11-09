@@ -7,6 +7,7 @@ import { Field, TypeBadge, typeLabel, cn } from "@/components/ui";
 import { ChainBlock } from "@/components/blocks/ChainBlock";
 import { ParentPicker, ROOT } from "@/components/blocks/ParentPicker";
 import { fetchChain, postLog } from "@/lib/api/client";
+import { PolicyRefsInput, refReady, toInput, type RefDraft } from "@/components/blocks/PolicyRefsInput";
 import type { Chain, LogNode, LogType } from "@/lib/types/domain";
 
 // 유형별 입력 안내 — 거친 메모라도 정제 LLM이 뽑을 재료가 들어오게 유도
@@ -31,6 +32,8 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
   const [preview, setPreview] = useState<Chain | null>(initialPreview ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refs, setRefs] = useState<RefDraft[]>([]); // 근거 조문(요청 J). 덜 채운 줄이 있으면 등록을 막는다
+  const refsIncomplete = refs.some((x) => !refReady(x));
 
   // 등록 → 화면에 머물고 우측 정제 패널이 진행 상황을 보여준다. 폼은 초기화.
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -47,6 +50,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         parent_id: parent === ROOT ? null : Number(parent),
         resolve_root: resolveRoot,
         problem_title: parent === ROOT && type === "success" ? String(fd.get("problem_title") ?? "").trim() : undefined,
+        ...(refs.length ? { policy_refs: refs.map(toInput) } : {}),
       });
       onCreated?.(node);
       form.reset();
@@ -55,6 +59,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
       setParent(ROOT);
       setPreview(null);
       setResolveRoot(false);
+      setRefs([]);
       setBusy(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "등록 실패");
@@ -134,11 +139,15 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         </label>
       )}
 
+      <Field label="근거 조문 (선택)" hint="이 조치가 사내 규정을 따랐는지, 예외였는지, 기준이 없었는지 남기면 AI 답변이 규정과 사례를 함께 인용합니다.">
+        <PolicyRefsInput wsId={wsId} value={refs} onChange={setRefs} />
+      </Field>
+
       <div className="flex gap-3 pt-1">
-        <Button type="reset" variant="outline" size="lg" className="h-11 flex-1" onClick={() => { setType("fail"); setTitle(""); setParent(ROOT); setPreview(null); setResolveRoot(false); }}>
+        <Button type="reset" variant="outline" size="lg" className="h-11 flex-1" onClick={() => { setType("fail"); setTitle(""); setParent(ROOT); setPreview(null); setResolveRoot(false); setRefs([]); }}>
           초기화
         </Button>
-        <Button type="submit" size="lg" className="h-11 flex-[2]" disabled={busy}>{busy ? "등록 중…" : "등록하고 AI 정리"}</Button>
+        <Button type="submit" size="lg" className="h-11 flex-[2]" disabled={busy || refsIncomplete} title={refsIncomplete ? "근거 조문 줄을 다 채우거나 빼 주세요" : undefined}>{busy ? "등록 중…" : "등록하고 AI 정리"}</Button>
       </div>
       {error && <p className="text-sm text-fail">{error}</p>}
     </form>

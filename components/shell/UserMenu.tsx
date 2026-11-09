@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, LogOut, Check } from "lucide-react";
+import { ChevronDown, LogOut, Check, UserRound } from "lucide-react";
 import { Avatar, Chip, cn } from "@/components/ui";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/api/auth";
@@ -48,6 +48,7 @@ export function UserMenu({ me, wsId }: { me: Me; wsId: number }) {
             ))}
           </ul>
           <div className="mt-2 border-t border-border pt-2">
+            <Link role="menuitem" href={`/w/${wsId}/me`} onClick={() => setOpen(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-ink hover:bg-primary-50"><UserRound className="size-3.5" /> 내 정보</Link>
             <button role="menuitem" type="button" onClick={() => logout()} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-ink hover:bg-primary-50"><LogOut className="size-3.5" /> 로그아웃</button>
           </div>
           {!current && <p className="px-2 pt-2 text-[11px] text-fail">이 워크스페이스의 멤버가 아닙니다</p>}

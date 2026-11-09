@@ -1,7 +1,7 @@
 // 데이터 접근 단일 지점 (서버 컴포넌트용). Spring /api/v1 을 호출한다. 목업 store·mocks 의존 없음.
 // 함수 이름·반환 모양은 목업 때와 같게 유지 → page.tsx 는 고치지 않는다
 import { connection } from "next/server";
-import type { Workspace, LogNode, LogCounts, Chain, DashboardSummary, PolicyDocument, DocEvent } from "@/lib/types/domain";
+import type { Workspace, Member, ManageableWorkspace, RevisionImpact, LogNode, LogCounts, Chain, DashboardSummary, PolicyDocument, DocEvent } from "@/lib/types/domain";
 import { serverGet, serverGetOrNull } from "@/lib/api/server";
 
 // 워크스페이스 — 로그인 상태면 내가 소속된 곳, 로그인 전이면 부서 목록 (GET /workspaces 는 로그인 없이 열림)
@@ -46,3 +46,17 @@ export async function requestNonce(): Promise<number> {
   await connection();
   return Date.now();
 }
+
+// 관리자 화면 초기값 (서버 컴포넌트). 권한이 없으면 403 → 빈 목록으로 두고 화면이 탭을 숨긴다
+export async function getMembers(wsId: number): Promise<Member[]> {
+  return serverGet<Member[]>("/users", wsId).catch(() => []);
+}
+export async function getManageable(): Promise<ManageableWorkspace[]> {
+  return serverGet<ManageableWorkspace[]>("/workspaces/manageable").catch(() => []);
+}
+
+// 규정 개정 영향 (요청 K·L, D-3). 실패하면 null — 대시보드는 카드를 숨긴다
+export async function getRevisionImpact(wsId: number): Promise<RevisionImpact | null> {
+  return serverGet<RevisionImpact>("/policy-revisions/impact", wsId).catch(() => null);
+}
+

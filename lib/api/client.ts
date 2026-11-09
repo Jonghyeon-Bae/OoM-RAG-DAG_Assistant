@@ -1,7 +1,7 @@
 // 클라이언트 컴포넌트용. 브라우저 → /api/v1 (next.config rewrites → Spring :8080).
 // 일반 요청은 axios, 채팅 SSE 만 fetch (axios 는 브라우저에서 스트림을 조각으로 못 받는다).
 import axios from "axios";
-import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent } from "@/lib/types/domain";
+import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, Member, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
@@ -39,6 +39,14 @@ const codeText: Record<string, string> = {
   NOT_ROOT: "시작 로그에서만 할 수 있습니다",
   REF_ROOT: "참고 자료는 완료 처리 대상이 아닙니다",
   PROBLEM_TITLE_REQUIRED: "어떤 문제를 해결했는지 제목을 적어 주세요",
+  RESOLVED_NODE_INVALID: "고른 기록 중 이 장애 건의 해결 기록이 될 수 없는 것이 있습니다. 화면을 새로 고쳐 주세요",
+  CATEGORY_INVALID: "원인 표시는 상위가 있는 실패 기록에만 할 수 있습니다",
+  POLICY_REF_NOT_FOUND: "그 조문을 찾을 수 없습니다. 폐기된 구판 조문일 수 있습니다",
+  // 관리자 (D-5)
+  FORBIDDEN: "권한이 없습니다",
+  EMPLOYEE_NO_TAKEN: "다른 회사에서 이미 쓰는 사번입니다",
+  ALREADY_MEMBER: "이미 이 워크스페이스의 멤버입니다",
+  NO_SOURCE: "규정과 해결 사례를 모두 끌 수는 없습니다",
 };
 export type ApiFail = { ok: false; code?: string; message: string };
 const fail = (e: unknown, what: string): ApiFail => {
@@ -57,12 +65,22 @@ export async function fetchChain(wsId: number, entryId: number): Promise<Chain |
   }
 }
 
-export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string }): Promise<LogNode> {
+export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string; policy_refs?: PolicyRefInput[] }): Promise<LogNode> {
   try {
     const { data } = await api.post<LogNode>("/logs", input, ws(wsId));
     return data;
   } catch (e) {
-    throw new Error(errBody(e)?.message ?? `등록 실패 (${httpStatus(e)})`);
+    throw new Error(fail(e, "등록").message); // 업무 코드는 codeText 문구로 (POLICY_REF_NOT_FOUND 등)
+  }
+}
+
+// 등록 화면의 근거 조문 고르기 — 이 부서(상위 포함)에서 검색되는 활성 규정의 조문만 (요청 J, D-2)
+export async function fetchPolicyArticles(wsId: number, q: string, limit = 20): Promise<PolicyArticleOption[]> {
+  try {
+    const { data } = await api.get<PolicyArticleOption[]>("/logs/policy-articles", { ...ws(wsId), params: { q, limit } });
+    return data;
+  } catch {
+    return [];
   }
 }
 
@@ -232,5 +250,43 @@ export async function fetchDocEvents(wsId: number, documentId?: number): Promise
     return data;
   } catch {
     return [];
+  }
+}
+
+// ── 관리자 (D-5, FE-013 §3.1) — 백엔드 UserAdminController · WorkspaceController ──
+// 멤버 목록·초대·잠금 해제는 "현재 워크스페이스의 admin"(X-Workspace-Id 기준), 부서 설정은 can_configure(로그인 사용자 기준)
+export async function inviteUser(wsId: number, body: InviteInput): Promise<{ ok: true; data: InviteResult } | ApiFail> {
+  try {
+    const { data } = await api.post<InviteResult>("/users", body, ws(wsId));
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, "초대");
+  }
+}
+
+export async function unlockUser(wsId: number, userId: number): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.post(`/users/${userId}/unlock`, null, ws(wsId));
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "잠금 해제");
+  }
+}
+
+export async function fetchMembers(wsId: number): Promise<Member[]> {
+  try {
+    const { data } = await api.get<Member[]>("/users", ws(wsId));
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+export async function patchWorkspaceSettings(id: number, body: { policy_enabled?: boolean; case_enabled?: boolean }): Promise<{ ok: true; data: Workspace } | ApiFail> {
+  try {
+    const { data } = await api.patch<Workspace>(`/workspaces/${id}`, body);
+    return { ok: true, data };
+  } catch (e) {
+    return fail(e, "부서 설정");
   }
 }

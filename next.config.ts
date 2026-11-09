@@ -3,7 +3,8 @@ import type { NextConfig } from "next";
 const API_ORIGIN = process.env.API_ORIGIN ?? "http://localhost:8080";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 운영 이미지: .next/standalone 의 server.js 하나로 뜬다 (요청 F, 11/07 전달 §3.4). 로컬 next dev 에는 영향 없음
+  output: "standalone",
   experimental: {
     agentFeedback: true,
   },
@@ -18,7 +19,8 @@ const nextConfig: NextConfig = {
       },
     },
   },
-  // /api/v1/* 를 Spring 으로 넘긴다. 브라우저는 3000 하나만 보니 CORS 가 안 생기고 쿠키도 3000 에 붙는다. 로컬 개발 전용(운영은 Caddy)
+  // /api/v1/* 를 Spring 으로 넘긴다. 브라우저는 3000 하나만 보니 CORS 가 안 생기고 쿠키도 3000 에 붙는다. 로컬 개발 전용.
+  // 운영은 Caddy 가 /api/v1/* 를 web 앞에서 api 로 보내므로 이 규칙에 닿지 않는다(빌드 시 API_ORIGIN 기본값이 박혀도 무해)
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${API_ORIGIN}/api/v1/:path*` }];
   },

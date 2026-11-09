@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/api";
 import { getCurrentUser } from "@/lib/api/session";
+import { accessOf } from "@/lib/access";
 import { Sidebar } from "@/components/shell/Sidebar";
 
 export default async function WorkspaceLayout({
@@ -25,7 +26,7 @@ export default async function WorkspaceLayout({
   if (!ws) notFound();
   return (
     <div className="flex min-h-screen flex-1 flex-col md:flex-row">
-      <Sidebar wsId={ws.id} policyEnabled={ws.policy_enabled} caseEnabled={ws.case_enabled} />
+      <Sidebar wsId={ws.id} policyEnabled={ws.policy_enabled} caseEnabled={ws.case_enabled} adminMenu={accessOf(me, ws.id).adminMenu} />
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
     </div>
   );

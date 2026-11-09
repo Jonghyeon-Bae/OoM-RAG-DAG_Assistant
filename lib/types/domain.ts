@@ -222,8 +222,34 @@ export interface Me {
   title: string | null;
   email: string | null;
   workspace_id: number | null;
-  workspaces: { id: number; name: string; policy_enabled: boolean; case_enabled: boolean; role: string; can_configure: boolean }[];
+  workspaces: { id: number; name: string; policy_enabled: boolean; case_enabled: boolean; role: string; can_configure: boolean }[]; // kind='dept' 만
   must_change_password: boolean;
   consent_required: boolean;
   password_expires_at: string | null;
+  company_admin: boolean; // 전사 공통(kind≠dept) ws 의 admin. 전사 ws 는 workspaces[]에 넣지 않는다(부서만)
 }
+
+// ── 관리자 (UserAdminController · WorkspaceController) ──
+export type MemberRole = "admin" | "member";
+export interface Member { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null; role: MemberRole; locked: boolean }
+export interface InviteInput { employee_no: string; name: string; email?: string; title?: string; role: MemberRole }
+// temp_password: 새 계정일 때만 1회 내려온다(created=false 면 null — 기존 계정을 멤버로만 추가). 화면 밖으로 남기지 않는다
+export interface InviteResult { id: number; employee_no: string; name: string; workspace_id: number; role: MemberRole; created: boolean; temp_password: string | null }
+// GET /workspaces/manageable — 설정을 바꿀 수 있는 부서. policy_docs = 상위 포함 활성 규정 수, cases = 활성 사례 수
+export interface ManageableWorkspace { id: number; name: string; policy_enabled: boolean; case_enabled: boolean; parent_id: number | null; policy_docs: number; cases: number }
+
+// ── 사례의 근거 조문 입력 (PolicyRefService.RefInput / ArticleOption) — 최대 5건 ──
+// follows·exception: policy(문서 slug)+article(조문 표기) 필수. gap: topic(무엇에 대한 기준이 없나) 필수
+export interface PolicyRefInput { relation: PolicyRelation; policy?: string; article?: string; note?: string; topic?: string }
+export interface PolicyArticleOption { policy: string; doc_title: string; article: string; article_label: string }
+
+// ── 규정 개정 영향 (GET /policy-revisions/impact, PolicyRevisionController) ──
+// 개정(폐기)된 규정 조문을 근거로 적은 이 부서 사례. same 조문 그대로 · amended 조문 내용 바뀜(사례는 옛 기준) · replaced 대응 조문 없음(다시 연결 필요)
+export type RevisionStatus = "same" | "amended" | "replaced";
+export interface RevisionImpactItem {
+  node_id: number; title: string; type: LogType; relation: PolicyRelation; policy: string; article: string; note: string | null; status: RevisionStatus;
+  from_label: string | null; current_policy: string | null; current_title: string | null; current_version: string | null; current_label: string | null;
+  suggested_article: string | null; suggested_label: string | null; // replaced 일 때 내용이 가장 가까운 새 조문(제안, 사람이 확인)
+}
+export interface RevisionImpact { cases: number; summary: Record<RevisionStatus, number>; items: RevisionImpactItem[] }
+
