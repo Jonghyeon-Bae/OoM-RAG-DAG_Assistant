@@ -20,7 +20,8 @@ const nextConfig: NextConfig = {
     },
   },
   // /api/v1/* 를 Spring 으로 넘긴다. 브라우저는 3000 하나만 보니 CORS 가 안 생기고 쿠키도 3000 에 붙는다. 로컬 개발 전용.
-  // 운영은 Caddy 가 /api/v1/* 를 web 앞에서 api 로 보내므로 이 규칙에 닿지 않는다(빌드 시 API_ORIGIN 기본값이 박혀도 무해)
+  // 주의: rewrites 목적지는 빌드 때 고정된다(next build → routes-manifest). 운영 이미지는 Caddy 가 /api/v1/* 를 web 앞에서 api 로 보내 이 규칙에 닿지 않는다.
+  // Caddy 없이 이미지 하나로 확인할 때는 --build-arg API_ORIGIN=... 로 빌드해야 한다 — 실행 때 -e API_ORIGIN 은 서버 컴포넌트에만 먹는다 (#092)
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${API_ORIGIN}/api/v1/:path*` }];
   },
