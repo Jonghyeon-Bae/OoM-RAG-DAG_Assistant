@@ -35,14 +35,14 @@ export function UserMenu({ me, wsId }: { me: Me; wsId: number }) {
       {open && (
         <div role="menu" className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-border bg-card p-2 shadow-lg">
           <div className="px-2 py-1.5 text-xs text-ink-muted">{me.name} · {me.employee_no}{me.title && ` · ${me.title}`}</div>
-          <div className="mt-1 px-2 text-[11px] font-semibold text-ink-muted">워크스페이스</div>
+          <div className="mt-1 px-2 text-xs font-semibold text-ink-muted">워크스페이스</div>
           <ul className="mt-1 flex flex-col">
             {me.workspaces.map((w) => (
               <li key={w.id}>
                 <Link role="menuitem" href={`/w/${w.id}/${section}`} onClick={() => setOpen(false)} className={cn("flex items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-primary-50", w.id === wsId && "bg-primary-50")}>
                   <Check className={cn("size-3.5", w.id === wsId ? "text-primary-700" : "opacity-0")} />
                   <span className="min-w-0 flex-1 truncate text-ink">{w.name}</span>
-                  <Chip tone={modeTone(modeOf(w))} className="h-5 text-[10px]">{modeShort[modeOf(w)]}</Chip>
+                  <Chip tone={modeTone(modeOf(w))} className="h-5 text-xs">{modeShort[modeOf(w)]}</Chip>
                 </Link>
               </li>
             ))}
@@ -51,7 +51,7 @@ export function UserMenu({ me, wsId }: { me: Me; wsId: number }) {
             <Link role="menuitem" href={`/w/${wsId}/me`} onClick={() => setOpen(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-ink hover:bg-primary-50"><UserRound className="size-3.5" /> 내 정보</Link>
             <button role="menuitem" type="button" onClick={() => logout()} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm text-ink hover:bg-primary-50"><LogOut className="size-3.5" /> 로그아웃</button>
           </div>
-          {!current && <p className="px-2 pt-2 text-[11px] text-fail">이 워크스페이스의 멤버가 아닙니다</p>}
+          {!current && <p className="px-2 pt-2 text-xs text-fail">이 워크스페이스의 멤버가 아닙니다</p>}
         </div>
       )}
     </div>

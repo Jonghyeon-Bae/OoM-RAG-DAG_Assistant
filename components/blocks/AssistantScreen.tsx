@@ -135,6 +135,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   const [history, setHistory] = useState<{ open: boolean; items: SearchSession[]; loading: boolean }>({ open: false, items: [], loading: false });
   const ctrl = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const srcRef = useRef<HTMLDivElement>(null); // 1열(~1023): 규정 마커를 누르면 아래 원문 패널로 이동
   const endRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true); // 사용자가 위로 올려 읽는 중이면 자동 스크롤을 멈춘다
   const policyMode = ws.policy_enabled; // 규정 원문 패널 유무
@@ -224,7 +225,11 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   // 마커 클릭: P → 그 턴의 규정 원문, N → 해결 흐름 카드 강조. 이전 턴의 근거도 다시 볼 수 있다
   const cite = (index: number, turn: Turn, ref: string) => {
     setSourceTurn(index === state.turns.length - 1 ? null : index);
-    if (ref.startsWith("P")) { setActiveRef(ref); return; }
+    if (ref.startsWith("P")) {
+      setActiveRef(ref);
+      if (window.matchMedia("(max-width: 1023px)").matches) setTimeout(() => srcRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+      return;
+    }
     const node = turn.chain?.nodes.find((n) => n.ref === ref);
     if (node) setActiveNode(node.id);
   };
@@ -232,15 +237,15 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   const sourceOf = state.turns[sourceIndex];
 
   return (
-    <main className={cn("grid flex-1 items-start gap-6 p-4 md:p-6 xl:p-8", policyMode ? "xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1")}>
-      <section className={cn("flex min-w-0 flex-col md:h-[calc(100dvh-8rem)] xl:h-[calc(100dvh-9rem)]", !policyMode && "mx-auto w-full max-w-4xl")}>
-        <div ref={listRef} onScroll={onListScroll} className="flex flex-1 flex-col gap-4 md:min-h-0 md:overflow-y-auto md:pr-1">
+    <main className={cn("grid flex-1 items-start gap-4 p-3 sm:gap-6 md:p-6 xl:p-8", policyMode ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1")}>
+      <section className={cn("flex min-w-0 flex-col lg:h-[calc(100dvh-8rem)] xl:h-[calc(100dvh-9rem)]", !policyMode && "mx-auto w-full max-w-4xl")}>
+        <div ref={listRef} onScroll={onListScroll} className="flex flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           {state.turns.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center text-sm text-ink-muted">
               <p className="font-medium text-ink">{modeIntro[mode]}</p>
               <div className="mt-1 flex flex-wrap justify-center gap-2">
                 {ws.suggestions.map((q) => (
-                  <button key={q} type="button" onClick={() => ask(q)} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-ink hover:bg-primary-50">{q}</button>
+                  <button key={q} type="button" onClick={() => ask(q)} className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-ink hover:bg-primary-50 pointer-coarse:px-4 pointer-coarse:py-2.5 pointer-coarse:text-sm">{q}</button>
                 ))}
               </div>
               <button type="button" onClick={toggleHistory} className="mt-2 inline-flex items-center gap-1 rounded-full border border-border px-3 py-1 text-xs text-ink hover:bg-primary-50"><History className="size-3" /> 이전에 물어본 것 보기</button>
@@ -260,9 +265,9 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
                 const isLast = i === state.turns.length - 1;
                 return (
                   <div key={`${t.askedAt}-${i}`} className="flex flex-col gap-3">
-                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-ink px-5 py-3 text-sm leading-relaxed text-white sm:max-w-[62%]">
+                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-ink px-4 py-3 text-sm sm:px-5 leading-relaxed text-white sm:max-w-[62%]">
                       {t.query}
-                      <span className="mt-1 block text-right text-[11px] text-white/60">{fmtTime(t.askedAt)}</span>
+                      <span className="mt-1 block text-right text-xs text-white/60">{fmtTime(t.askedAt)}</span>
                     </div>
                     {isLast && <PipelineBadges turn={t} />}
                     <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} wsId={ws.id} collapsed={!isLast} highlighted={sourceIndex === i && !isLast} activeNode={sourceIndex === i ? activeNode : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} />
@@ -274,7 +279,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
           )}
         </div>
 
-        <div className="sticky bottom-0 mt-4 bg-background pb-2 pt-2 md:static">
+        <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 mt-4 bg-background pb-2 pt-2 lg:static">
           <form className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2 pl-5 shadow-sm" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
             <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={modeHint[mode]} className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" disabled={streaming} />
             {streaming ? (
@@ -287,12 +292,14 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
       </section>
 
       {policyMode && (
+        <div ref={srcRef} className={cn("min-w-0 scroll-mt-16 lg:contents", !sourceOf?.policy?.length && "max-lg:hidden")}>{/* 1열에서는 인용된 조항이 있을 때만 */}
         <SourceViewer
           sources={sourceOf?.policy ?? []}
           activeRef={activeRef}
           onSelect={setActiveRef}
           context={sourceOf && sourceTurn !== null ? { query: sourceOf.query, onBack: () => { setSourceTurn(null); setActiveRef(current?.policy[0]?.ref ?? null); } } : undefined}
         />
+        </div>
       )}
     </main>
   );
@@ -311,13 +318,13 @@ function HistoryPanel({ history, onPick, onClose }: { history: { items: SearchSe
           {history.items.map((x) => (
             <li key={x.id}>
               <button type="button" onClick={() => onPick(x)} className="flex w-full items-center gap-3 px-1 py-2 text-left text-sm hover:bg-primary-50">
-                <span className="w-24 shrink-0 text-[11px] tabular-nums text-ink-muted">{new Date(x.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                <span className="w-24 shrink-0 text-xs tabular-nums text-ink-muted">{new Date(x.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                 <span className="min-w-0 flex-1 truncate text-ink">{x.query}</span>
-                <Chip className="h-5 shrink-0 text-[11px]">{intentLabel[x.intent]}</Chip>
-                {x.status !== "done" && <Chip tone={x.status === "error" ? "fail" : "warn"} className="h-5 shrink-0 text-[11px]">{x.status === "error" ? "중단됨" : "진행 중"}</Chip>}
-                <span className="w-14 shrink-0 text-right text-[11px] text-ink-muted">근거 {x.citations?.verified.length ?? 0}</span>
-                <span className="w-5 shrink-0 text-center text-[11px]">{x.score === 1 ? "👍" : x.score === -1 ? "👎" : ""}</span>
-                <span className="hidden w-12 shrink-0 text-right text-[11px] text-ink-muted sm:block">{x.user_name}</span>
+                <Chip className="h-5 shrink-0 text-xs">{intentLabel[x.intent]}</Chip>
+                {x.status !== "done" && <Chip tone={x.status === "error" ? "fail" : "warn"} className="h-5 shrink-0 text-xs">{x.status === "error" ? "중단됨" : "진행 중"}</Chip>}
+                <span className="w-14 shrink-0 text-right text-xs text-ink-muted">근거 {x.citations?.verified.length ?? 0}</span>
+                <span className="w-5 shrink-0 text-center text-xs">{x.score === 1 ? "👍" : x.score === -1 ? "👎" : ""}</span>
+                <span className="hidden w-12 shrink-0 text-right text-xs text-ink-muted sm:block">{x.user_name}</span>
               </button>
             </li>
           ))}
@@ -379,7 +386,7 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
             const unverified = tone(m[1]) === "warn";
             return (
               <button key={j} type="button" onClick={() => onCite(m[1])} className="mx-0.5 inline-flex align-middle" title={unverified ? `${describe(m[1])} — 출처 미확인` : describe(m[1])}>
-                <Chip tone={tone(m[1])} className="h-5 px-1.5 text-[11px]">{m[1].startsWith("P") ? `규정 ${m[1].slice(1)}` : `기록 ${m[1].slice(1)}`}</Chip>
+                <Chip tone={tone(m[1])} className="h-5 px-1.5 text-xs">{m[1].startsWith("P") ? `규정 ${m[1].slice(1)}` : `기록 ${m[1].slice(1)}`}</Chip>
               </button>
             );
           })}
@@ -390,7 +397,7 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
   if (!open) {
     return (
       <button type="button" onClick={() => { setOpen(true); onOpen(); }} className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm hover:bg-primary-50">
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink text-[10px] font-bold text-white">AI</span>
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-bold text-white">AI</span>
         <span className="line-clamp-2 flex-1 text-ink-muted">{turn.text.replace(/^## .*$/gm, "").replace(/\[[PN]\d+\]/g, "").trim() || turn.error || "답변 없음"}</span>
         <ChevronDown className="size-4 shrink-0 text-ink-muted" />
       </button>
@@ -412,7 +419,7 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
       {turn.text ? <div>{render(turn.text)}</div> : turn.status === "streaming" ? <p className="text-sm text-ink-muted">검색 중…</p> : null}
 
       {(hasP || hasN) && (
-        <p className="mt-3 text-[11px] text-ink-muted">
+        <p className="mt-3 text-xs text-ink-muted">
           번호는 답의 근거입니다 — {hasP && <><b>규정 n</b> = 규정 문서의 조항(오른쪽 원문)</>}{hasP && hasN && " · "}{hasN && <><b>기록 n</b> = 아래 해결 흐름의 n번째 기록</>}. 번호를 누르면 해당 위치로 이동합니다.
         </p>
       )}
@@ -421,7 +428,7 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
         <div className="mt-3 flex flex-wrap gap-2">
           {turn.policy.map((p) => (
             <button key={p.chunk_id} type="button" onClick={() => onCite(p.ref)} className={cn("rounded-full border px-3 py-1 text-xs transition-colors", c?.verified.includes(p.ref) ? "border-primary-400 bg-primary-50 text-primary-700" : "border-border text-ink-muted")}>
-              규정 {p.ref.slice(1)} · {p.doc_title} {p.version} · {p.article_label.split(" ")[0]} · p.{p.page}
+              규정 {p.ref.slice(1)} · {p.doc_title} {p.version} · {p.article_label.split(" ")[0]}{p.page != null && ` · p.${p.page}`}
             </button>
           ))}
         </div>

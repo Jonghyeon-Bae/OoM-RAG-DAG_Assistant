@@ -43,7 +43,7 @@ export default async function HomePage() {
             {workspaces.map((ws) => (
               <li key={ws.id} className="flex items-center justify-between rounded-lg border border-border bg-primary-50 px-3 py-2.5">
                 <span className="text-sm text-ink">{ws.name}</span>
-                <Chip tone={modeTone(modeOf(ws))} className="h-5 text-[11px]">{modeLabel[modeOf(ws)]}</Chip>
+                <Chip tone={modeTone(modeOf(ws))} className="h-5 text-xs">{modeLabel[modeOf(ws)]}</Chip>
               </li>
             ))}
           </ul>

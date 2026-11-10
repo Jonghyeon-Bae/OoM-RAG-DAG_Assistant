@@ -4,7 +4,7 @@ import { Plus, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/components/ui";
-import { relationLabel } from "@/components/blocks/ChainBlock";
+import { relationLabel } from "@/lib/relation";
 import { fetchPolicyArticles } from "@/lib/api/client";
 import type { PolicyArticleOption, PolicyRefInput, PolicyRelation } from "@/lib/types/domain";
 

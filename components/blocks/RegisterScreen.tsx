@@ -18,7 +18,7 @@ function Toast({ message, href, onClose }: { message: string | null; href?: stri
   }, [message, onClose]);
   if (!message) return null;
   return (
-    <div role="status" className="fixed right-6 top-6 z-50 flex items-center gap-3 rounded-xl border border-success-bg bg-card px-4 py-3 text-sm shadow-lg">
+    <div role="status" className="fixed inset-x-3 top-3 z-50 flex flex-wrap items-center gap-3 sm:inset-x-auto sm:right-6 sm:top-6 rounded-xl border border-success-bg bg-card px-4 py-3 text-sm shadow-lg">
       <CheckCircle2 className="size-5 text-success" />
       <span className="text-ink">{message}</span>
       {href && <Link href={href} className="rounded-md bg-primary-100 px-2.5 py-1 text-xs font-semibold text-primary-700 hover:bg-primary-200">타임라인에서 보기</Link>}
@@ -36,10 +36,10 @@ export function RegisterScreen({ wsId, candidates: initialCandidates, initialRec
   const [nextParent, setNextParent] = useState<string | undefined>(initialParent);
   const [nextPreview, setNextPreview] = useState<Chain | null>(initialPreview ?? null);
   return (
-    <main className="grid items-start gap-6 p-4 md:p-6 xl:grid-cols-[440px_1fr] xl:p-8">
+    <main className="grid items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)] xl:grid-cols-[440px_minmax(0,1fr)] xl:p-8">
       <Toast message={toast?.message ?? null} href={toast?.href} onClose={() => setToast(null)} />
-      <Card className="min-w-0 p-6">
-        <h2 className="mb-5 font-bold text-ink">마이크로 업무로그 간편 등록</h2>
+      <Card className="min-w-0 overflow-visible p-4 sm:p-6">{/* overflow-visible: 고정 등록 바(sticky)가 카드 안에서 동작하도록 */}
+        <h2 className="mb-4 font-bold text-ink sm:mb-5">마이크로 업무로그 간편 등록</h2>
         <LogForm
           key={formKey}
           wsId={wsId}

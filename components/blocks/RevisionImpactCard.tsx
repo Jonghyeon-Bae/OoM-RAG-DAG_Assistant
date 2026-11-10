@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Chip, TypeBadge } from "@/components/ui";
-import { relationLabel } from "@/components/blocks/ChainBlock";
+import { relationLabel } from "@/lib/relation";
 import type { RevisionImpact, RevisionStatus } from "@/lib/types/domain";
 
 // 규정 개정 영향 (백엔드 요청 K·L, D-3 기본안: 대시보드 상단). 개정된 규정 조문을 근거로 적은 사례가 개정 뒤 어떻게 되는지.
@@ -41,7 +41,7 @@ export function RevisionImpactCard({ wsId, impact, limit = 6 }: { wsId: number; 
               {relationLabel[it.relation]} · {it.from_label ?? `${it.policy} ${it.article}`}
               {it.status !== "same" && <> → <b className="text-ink">{it.current_label ? `${it.current_title ?? ""} ${it.current_label}` : it.suggested_label ? `제안: ${it.suggested_label}` : "대응 조문 없음"}</b></>}
             </span>
-            <Chip tone={statusTone[it.status]} className="h-5 w-fit shrink-0 text-[11px]">{statusLabel[it.status]}</Chip>
+            <Chip tone={statusTone[it.status]} className="h-5 w-fit shrink-0 text-xs">{statusLabel[it.status]}</Chip>
           </li>
         ))}
       </ul>

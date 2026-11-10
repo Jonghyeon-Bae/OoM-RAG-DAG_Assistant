@@ -10,10 +10,10 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
 
   return (
     // 오른쪽 패널: 흰 바탕 + 테두리 + 왼쪽 강조선으로 대화 영역과 구분, 스크롤해도 따라오게 sticky
-    <aside className="flex min-w-0 flex-col gap-3 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm">
+    <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between border-b border-border pb-3">
         <h2 className="font-bold text-ink">규정 원문</h2>
-        <Chip tone="primary" className="text-[11px]" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
+        <Chip tone="primary" className="text-xs" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
       </div>
 
       {context && (
@@ -28,8 +28,9 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
         <>
           <div className="flex flex-wrap gap-2">
             {sources.map((s) => (
-              <button key={s.ref} type="button" onClick={() => onSelect(s.ref)} className={cn("rounded-full px-3 py-1.5 text-xs font-medium transition-colors", s.ref === active?.ref ? "bg-primary-700 text-white" : "bg-ref-bg text-ref hover:bg-primary-100")}>
-                규정 {s.ref.slice(1)} · {s.doc_title.split("·")[0]} p.{s.page}
+              // 제목을 "·"로 자르지 않는다 — 새 규정 제목에 "·"가 들어 있어("배포·장애 대응 운영지침") 앞 단어만 남았다(#098). 길면 말줄임 + 툴팁
+              <button key={s.ref} type="button" onClick={() => onSelect(s.ref)} title={`${s.doc_title} ${s.article_label}`} className={cn("max-w-full truncate rounded-full px-3 py-1.5 text-xs font-medium transition-colors", s.ref === active?.ref ? "bg-primary-700 text-white" : "bg-ref-bg text-ref hover:bg-primary-100")}>
+                규정 {s.ref.slice(1)} · {s.doc_title}{s.page != null && ` p.${s.page}`}
               </button>
             ))}
           </div>
@@ -43,7 +44,7 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
                   <p key={i} className="rounded-lg bg-primary-50 px-3 py-2.5 text-sm leading-relaxed text-ink">{c}</p>
                 ))}
               </div>
-              <div className="text-xs text-ink-muted">p.{active.page}</div>
+              {active.page != null && <div className="text-xs text-ink-muted">p.{active.page}</div>}
             </div>
           )}
           {/* TODO Tier 2: GET /api/documents/{doc_id}/file → react-pdf 모달 */}

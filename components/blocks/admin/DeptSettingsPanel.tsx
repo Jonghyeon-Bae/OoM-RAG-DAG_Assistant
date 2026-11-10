@@ -39,7 +39,7 @@ export function DeptSettingsPanel({ initial }: { initial: ManageableWorkspace[] 
     );
   };
   return (
-    <Card className="gap-3 p-6">
+    <Card className="gap-3 p-4 sm:p-6">
       <div>
         <h2 className="font-bold text-ink">부서 설정</h2>
         <p className="mt-1 text-xs text-ink-muted">부서마다 AI 어시스턴트가 무엇을 근거로 답할지 정합니다. 해결 사례를 끄면 그 부서의 타임라인·업무로그 등록 메뉴가 닫힙니다(기록은 지워지지 않습니다). 변경은 감사 로그에 남습니다.</p>
@@ -48,7 +48,7 @@ export function DeptSettingsPanel({ initial }: { initial: ManageableWorkspace[] 
         {rows.map((w) => (
           <li key={w.id} className="flex flex-wrap items-center gap-x-6 gap-y-2 py-3">
             <div className="min-w-40 flex-1">
-              <div className="flex items-center gap-2"><span className="font-medium text-ink">{w.name}</span><Chip tone={modeTone(modeOf(w))} className="h-5 text-[11px]">{modeLabel[modeOf(w)]}</Chip></div>
+              <div className="flex items-center gap-2"><span className="font-medium text-ink">{w.name}</span><Chip tone={modeTone(modeOf(w))} className="h-5 text-xs">{modeLabel[modeOf(w)]}</Chip></div>
               <div className="mt-0.5 text-xs text-ink-muted">검색되는 규정 {w.policy_docs}종(전사 공통 포함) · 해결 사례 {w.cases}건</div>
             </div>
             {sw(w, "policy_enabled", "규정 사용", "사내 규정 조문을 근거로 답합니다")}
