@@ -162,7 +162,21 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   }, [state.turns, storageKey]);
   // 자동 스크롤: 새 턴은 항상, 토큰 추가는 바닥 근처에 있을 때만 최신 답으로 따라간다
   const scrollToEnd = (behavior: ScrollBehavior = "smooth") => endRef.current?.scrollIntoView({ block: "end", behavior });
-  useEffect(() => { stickToBottom.current = true; scrollToEnd("auto"); }, [state.turns.length]);
+  // 검색 내역에서 다시 연 답은 끝이 아니라 그 질문부터 보여 준다 — 바닥으로 내리면 질문·상단 줄이 헤더 뒤로 가려졌다(#104)
+  const turnRefs = useRef(new Map<number, HTMLDivElement>());
+  const focusTurn = useRef<number | null>(null);
+  const scrollToTurn = (i: number) => turnRefs.current.get(i)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  useEffect(() => {
+    if (focusTurn.current !== null) {
+      const i = focusTurn.current;
+      focusTurn.current = null;
+      stickToBottom.current = false;
+      scrollToTurn(i);
+      return;
+    }
+    stickToBottom.current = true;
+    scrollToEnd("auto");
+  }, [state.turns.length]);
   useEffect(() => { if (stickToBottom.current) scrollToEnd(); }, [current?.text.length, current?.status]);
   const onListScroll = () => {
     const el = listRef.current;
@@ -211,7 +225,8 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   const reopen = (x: SearchSession) => {
     setHistory((h) => ({ ...h, open: false }));
     const idx = state.turns.findIndex((t) => t.sessionId === x.id);
-    if (idx >= 0) { setSourceTurn(idx === state.turns.length - 1 ? null : idx); setActiveRef(x.policy[0]?.ref ?? null); return; }
+    if (idx >= 0) { setSourceTurn(idx === state.turns.length - 1 ? null : idx); setActiveRef(x.policy[0]?.ref ?? null); scrollToTurn(idx); return; }
+    focusTurn.current = state.turns.length;
     dispatch({ type: "reopen", turn: turnFromSession(x) });
     setSourceTurn(null);
     setActiveRef(x.policy[0]?.ref ?? null);
@@ -264,7 +279,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
               {state.turns.map((t, i) => {
                 const isLast = i === state.turns.length - 1;
                 return (
-                  <div key={`${t.askedAt}-${i}`} className="flex flex-col gap-3">
+                  <div key={`${t.askedAt}-${i}`} ref={(el) => { if (el) turnRefs.current.set(i, el); else turnRefs.current.delete(i); }} className="flex scroll-mt-20 flex-col gap-3 lg:scroll-mt-2">
                     <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-ink px-4 py-3 text-sm sm:px-5 leading-relaxed text-white sm:max-w-[62%]">
                       {t.query}
                       <span className="mt-1 block text-right text-xs text-white/60">{fmtTime(t.askedAt)}</span>
@@ -309,22 +324,28 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
 function HistoryPanel({ history, onPick, onClose }: { history: { items: SearchSession[]; loading: boolean }; onPick: (x: SearchSession) => void; onClose: () => void }) {
   return (
     <Card className="gap-2 p-4">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-ink">검색 내역 <span className="font-normal text-ink-muted">이 워크스페이스에서 물어본 질문. 누르면 그때 답을 다시 봅니다</span></span>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-ink">검색 내역</div>
+          <p className="text-xs text-ink-muted">이 워크스페이스에서 물어본 질문. 누르면 그때 답을 다시 봅니다</p>
+        </div>
         <button type="button" onClick={onClose} aria-label="닫기" className="rounded p-1 text-ink-muted hover:bg-primary-100"><X className="size-4" /></button>
       </div>
       {history.loading ? <p className="text-xs text-ink-muted">불러오는 중…</p> : history.items.length === 0 ? <p className="text-xs text-ink-muted">아직 기록이 없습니다.</p> : (
-        <ol className="max-h-64 divide-y divide-border overflow-y-auto">
+        <ol className="max-h-80 divide-y divide-border overflow-y-auto">
           {history.items.map((x) => (
             <li key={x.id}>
-              <button type="button" onClick={() => onPick(x)} className="flex w-full items-center gap-3 px-1 py-2 text-left text-sm hover:bg-primary-50">
-                <span className="w-24 shrink-0 text-xs tabular-nums text-ink-muted">{new Date(x.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="min-w-0 flex-1 truncate text-ink">{x.query}</span>
-                <Chip className="h-5 shrink-0 text-xs">{intentLabel[x.intent]}</Chip>
-                {x.status !== "done" && <Chip tone={x.status === "error" ? "fail" : "warn"} className="h-5 shrink-0 text-xs">{x.status === "error" ? "중단됨" : "진행 중"}</Chip>}
-                <span className="w-14 shrink-0 text-right text-xs text-ink-muted">근거 {x.citations?.verified.length ?? 0}</span>
-                <span className="w-5 shrink-0 text-center text-xs">{x.score === 1 ? "👍" : x.score === -1 ? "👎" : ""}</span>
-                <span className="hidden w-12 shrink-0 text-right text-xs text-ink-muted sm:block">{x.user_name}</span>
+              {/* 질문이 주인공: 1줄째 질문(최대 2줄), 2줄째 메타 — 열 고정 폭 때문에 질문이 "사후분…"으로 잘리던 것(#104) */}
+              <button type="button" onClick={() => onPick(x)} className="flex w-full flex-col gap-1 px-1 py-2.5 text-left hover:bg-primary-50">
+                <span className="line-clamp-2 text-sm text-ink">{x.query}</span>
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
+                  <span className="tabular-nums">{new Date(x.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  <Chip className="h-5 text-xs">{intentLabel[x.intent]}</Chip>
+                  {x.status !== "done" && <Chip tone={x.status === "error" ? "fail" : "warn"} className="h-5 text-xs">{x.status === "error" ? "중단됨" : "진행 중"}</Chip>}
+                  <span>근거 {x.citations?.verified.length ?? 0}</span>
+                  {x.score === 1 ? <span>👍</span> : x.score === -1 ? <span>👎</span> : null}
+                  <span className="ml-auto">{x.user_name}</span>
+                </span>
               </button>
             </li>
           ))}

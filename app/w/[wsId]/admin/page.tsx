@@ -15,7 +15,7 @@ async function Content({ params }: { params: Promise<{ wsId: string }> }) {
     return (<>{header}<main className="flex flex-1 items-start justify-center p-6 md:p-10"><Card className="max-w-lg p-8 text-sm text-ink-muted">이 워크스페이스의 관리자만 볼 수 있습니다.</Card></main></>);
   }
   const [members, manageable] = await Promise.all([a.wsAdmin ? getMembers(ws.id) : Promise.resolve(null), a.canConfigure ? getManageable() : Promise.resolve([])]);
-  return (<>{header}<AdminView wsId={ws.id} wsName={ws.name} members={members} manageable={manageable} /></>);
+  return (<>{header}<AdminView wsId={ws.id} wsName={ws.name} members={members} manageable={manageable} meId={me.id} companyAdmin={me.company_admin} /></>);
 }
 
 export default function AdminPage(props: { params: Promise<{ wsId: string }> }) {
