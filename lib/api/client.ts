@@ -1,7 +1,7 @@
 // 클라이언트 컴포넌트용. 브라우저 → /api/v1 (next.config rewrites → Spring :8080).
 // 일반 요청은 axios, 채팅 SSE 만 fetch (axios 는 브라우저에서 스트림을 조각으로 못 받는다).
 import axios from "axios";
-import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, Member, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
+import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, Member, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
@@ -47,6 +47,13 @@ const codeText: Record<string, string> = {
   EMPLOYEE_NO_TAKEN: "다른 회사에서 이미 쓰는 사번입니다",
   ALREADY_MEMBER: "이미 이 워크스페이스의 멤버입니다",
   NO_SOURCE: "규정과 해결 사례를 모두 끌 수는 없습니다",
+  SELF_DEMOTION: "자기 자신의 관리자 권한은 내릴 수 없습니다",
+  SELF_REMOVAL: "자기 자신은 부서에서 제외할 수 없습니다",
+  LAST_ADMIN: "부서에 관리자가 한 명은 있어야 합니다. 다른 관리자를 먼저 지정해 주세요",
+  // FE-REQ-004 (계정 비활성화·재활성화·비밀번호 재발급) — 백엔드 구현 전 제안 코드
+  SELF_DEACTIVATION: "자기 자신의 계정은 비활성화할 수 없습니다",
+  LAST_COMPANY_ADMIN: "회사 관리자가 한 명은 있어야 합니다",
+  ALREADY_INACTIVE: "이미 비활성화된 계정입니다",
 };
 export type ApiFail = { ok: false; code?: string; message: string };
 const fail = (e: unknown, what: string): ApiFail => {
@@ -270,6 +277,55 @@ export async function unlockUser(wsId: number, userId: number): Promise<{ ok: tr
     return { ok: true };
   } catch (e) {
     return fail(e, "잠금 해제");
+  }
+}
+
+// 역할 변경 · 부서에서 제외 — 백엔드 UserAdminController (main 459a8a1 기준 구현됨)
+export async function changeMemberRole(wsId: number, userId: number, role: MemberRole): Promise<{ ok: true; member: Member } | ApiFail> {
+  try {
+    const { data } = await api.patch<Member>(`/users/${userId}`, { role }, ws(wsId));
+    return { ok: true, member: data };
+  } catch (e) {
+    return fail(e, "역할 변경");
+  }
+}
+
+export async function removeMember(wsId: number, userId: number): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.delete(`/workspaces/${wsId}/members/${userId}`, ws(wsId));
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "부서에서 제외");
+  }
+}
+
+// 계정 비활성화(퇴사·장기 미사용)·재활성화·임시 비밀번호 재발급 — 회사 관리자. 백엔드 미구현: FE-REQ-004 제안 경로
+// 서버에 생기면 ACCOUNT_API_READY 만 true 로 바꾼다(화면은 이미 연결돼 있다)
+export const ACCOUNT_API_READY = false;
+export async function deactivateUser(wsId: number, userId: number, reason: string): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.post(`/users/${userId}/deactivate`, { reason }, ws(wsId));
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "계정 비활성화");
+  }
+}
+
+export async function reactivateUser(wsId: number, userId: number): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.post(`/users/${userId}/reactivate`, null, ws(wsId));
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "계정 재활성화");
+  }
+}
+
+export async function resetUserPassword(wsId: number, userId: number): Promise<{ ok: true; temp_password: string } | ApiFail> {
+  try {
+    const { data } = await api.post<{ temp_password: string }>(`/users/${userId}/reset-password`, null, ws(wsId));
+    return { ok: true, temp_password: data.temp_password };
+  } catch (e) {
+    return fail(e, "임시 비밀번호 재발급");
   }
 }
 
