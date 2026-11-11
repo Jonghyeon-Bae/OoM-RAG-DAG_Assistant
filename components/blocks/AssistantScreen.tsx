@@ -164,6 +164,9 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   const scrollToEnd = (behavior: ScrollBehavior = "smooth") => endRef.current?.scrollIntoView({ block: "end", behavior });
   // 검색 내역에서 다시 연 답은 끝이 아니라 그 질문부터 보여 준다 — 바닥으로 내리면 질문·상단 줄이 헤더 뒤로 가려졌다(#104)
   const turnRefs = useRef(new Map<number, HTMLDivElement>());
+  // 검색 내역은 대화 맨 위에 열린다 — 바닥을 보고 있으면 연 줄도 모르므로 그 자리로 올린다(#105)
+  const historyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (history.open) historyRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }); }, [history.open]);
   const focusTurn = useRef<number | null>(null);
   const scrollToTurn = (i: number) => turnRefs.current.get(i)?.scrollIntoView({ block: "start", behavior: "smooth" });
   useEffect(() => {
@@ -254,7 +257,8 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   return (
     <main className={cn("grid flex-1 items-start gap-4 p-3 sm:gap-6 md:p-6 xl:p-8", policyMode ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1")}>
       <section className={cn("flex min-w-0 flex-col lg:h-[calc(100dvh-8rem)] xl:h-[calc(100dvh-9rem)]", !policyMode && "mx-auto w-full max-w-4xl")}>
-        <div ref={listRef} onScroll={onListScroll} className="flex flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
+        {/* [&>*]:shrink-0 — 높이가 고정된 스크롤 칸 안의 flex 자식은 줄어든다. 검색 내역 카드가 32px로 눌려 답변 뒤에 가려졌다(D-014, #105) */}
+        <div ref={listRef} onScroll={onListScroll} className="flex flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1 [&>*]:shrink-0">
           {state.turns.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center text-sm text-ink-muted">
               <p className="font-medium text-ink">{modeIntro[mode]}</p>
@@ -275,7 +279,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
                   <button type="button" onClick={() => { stop(); dispatch({ type: "clear" }); }} title="화면만 비웁니다. 검색 내역은 남습니다" className="inline-flex items-center gap-1 hover:text-ink"><RotateCcw className="size-3" /> 화면 비우기</button>
                 </span>
               </div>
-              {history.open && <HistoryPanel history={history} onPick={reopen} onClose={() => setHistory((h) => ({ ...h, open: false }))} />}
+              {history.open && <div ref={historyRef} className="scroll-mt-20 lg:scroll-mt-2"><HistoryPanel history={history} onPick={reopen} onClose={() => setHistory((h) => ({ ...h, open: false }))} /></div>}
               {state.turns.map((t, i) => {
                 const isLast = i === state.turns.length - 1;
                 return (
