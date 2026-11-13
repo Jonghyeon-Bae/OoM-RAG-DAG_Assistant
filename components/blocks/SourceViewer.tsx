@@ -2,9 +2,10 @@
 import { Button } from "@/components/ui/button";
 import { Chip, cn } from "@/components/ui";
 import type { PolicyRef } from "@/lib/types/domain";
+import { shortArticle } from "@/lib/article";
 
 // JSON 근거 카드 (03 안건 A). 청크 텍스트를 ①②③ 항 단위로 쪼개 전부 하이라이트. react-pdf 원문은 Tier 2.
-export function SourceViewer({ sources, activeRef, onSelect, context }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void; context?: { query: string; onBack: () => void } }) {
+export function SourceViewer({ sources, activeRef, onSelect, context, current }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void; context?: { query: string; onBack?: () => void }; current?: boolean }) {
   const active = sources.find((s) => s.ref === activeRef) ?? sources[0];
   const clauses = active ? active.text.split(/(?=[①②③④⑤⑥⑦⑧⑨])/).map((s) => s.trim()).filter(Boolean) : [];
 
@@ -17,9 +18,9 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
       </div>
 
       {context && (
-        <div className="flex items-start gap-2 rounded-lg bg-warn-bg/60 px-3 py-2 text-xs text-ink">
-          <span className="min-w-0 flex-1">이전 질문의 근거: <b className="line-clamp-1">{context.query}</b></span>
-          <button type="button" onClick={context.onBack} className="shrink-0 font-medium text-primary-700 hover:underline">최신으로</button>
+        <div className={cn("flex items-start gap-2 rounded-lg px-3 py-2 text-xs text-ink", context.onBack ? "bg-warn-bg/60" : "bg-primary-100")}>
+          <span className="min-w-0 flex-1">{context.onBack ? "이전 질문의 근거" : "이 답변의 근거"}: <b className="line-clamp-1">{context.query}</b></span>
+          {context.onBack && <button type="button" onClick={context.onBack} className="shrink-0 font-medium text-primary-700 hover:underline">최신으로</button>}
         </div>
       )}
       {sources.length === 0 ? (
@@ -30,14 +31,14 @@ export function SourceViewer({ sources, activeRef, onSelect, context }: { source
             {sources.map((s) => (
               // 제목을 "·"로 자르지 않는다 — 새 규정 제목에 "·"가 들어 있어("배포·장애 대응 운영지침") 앞 단어만 남았다(#098). 길면 말줄임 + 툴팁
               <button key={s.ref} type="button" onClick={() => onSelect(s.ref)} title={`${s.doc_title} ${s.article_label}`} className={cn("max-w-full truncate rounded-full px-3 py-1.5 text-xs font-medium transition-colors", s.ref === active?.ref ? "bg-primary-700 text-white" : "bg-ref-bg text-ref hover:bg-primary-100")}>
-                규정 {s.ref.slice(1)} · {s.doc_title}{s.page != null && ` p.${s.page}`}
+                규정 {s.ref.slice(1)} · {shortArticle(s.article_label)}{s.page != null && ` p.${s.page}`}
               </button>
             ))}
           </div>
 
           {active && (
             <div className="flex flex-col gap-3 rounded-xl border border-border p-4">
-              <div className="text-xs text-ink-muted">{active.doc_title} {active.version}</div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">{active.doc_title} {active.version}{current && <span title="답변 시점에 검색 대상인 유효한 판입니다. 폐기·개정된 판은 검색되지 않습니다" className="rounded-full bg-success-bg px-2 py-0.5 font-medium text-success">현재 시행 중</span>}</div>
               <div className="text-base font-bold text-ink">{active.article_label}</div>
               <div className="flex flex-col gap-2">
                 {clauses.map((c, i) => (

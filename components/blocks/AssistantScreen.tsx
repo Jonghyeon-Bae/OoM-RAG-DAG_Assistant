@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useReducer, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUp, ChevronDown, Loader2, Square, ExternalLink, RotateCcw, History, X } from "lucide-react";
+import { ArrowRight, ArrowUp, ChevronDown, Loader2, Square, ExternalLink, RotateCcw, History, X, CircleCheck, TriangleAlert, CircleMinus, Check, Info, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { SourceViewer } from "@/components/blocks/SourceViewer";
 import { fetchSessions, patchSessionScore, streamChat } from "@/lib/api/client";
 import { modeOf, type WsMode } from "@/lib/mode";
 import type { Chain, ChainEvent, ChatEvent, CitationsEvent, DoneEvent, Intent, Mode, PolicyRef, SearchSession, StageNode, StageStatus, Workspace } from "@/lib/types/domain";
+import { shortArticle } from "@/lib/article";
 
 // ── 한 질의(턴)의 상태: SSE 이벤트 9종이 차례로 채운다. 실서버에서는 턴 1개 = search_sessions 1행 ──
 type Status = "idle" | "streaming" | "done" | "error";
@@ -253,6 +254,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
   };
   const sourceIndex = sourceTurn ?? state.turns.length - 1;
   const sourceOf = state.turns[sourceIndex];
+  const shownRef = activeRef ?? sourceOf?.policy[0]?.ref ?? null; // 패널이 실제로 보여 주는 근거 번호 (고른 게 없으면 첫 근거)
 
   return (
     <main className={cn("grid flex-1 items-start gap-4 p-3 sm:gap-6 md:p-6 xl:p-8", policyMode ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1")}>
@@ -289,7 +291,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
                       <span className="mt-1 block text-right text-xs text-white/60">{fmtTime(t.askedAt)}</span>
                     </div>
                     {isLast && <PipelineBadges turn={t} />}
-                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} wsId={ws.id} collapsed={!isLast} highlighted={sourceIndex === i && !isLast} activeNode={sourceIndex === i ? activeNode : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} />
+                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} wsId={ws.id} collapsed={!isLast} highlighted={sourceIndex === i && state.turns.length > 1} activeNode={sourceIndex === i ? activeNode : null} activeRef={sourceIndex === i ? shownRef : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} />
                   </div>
                 );
               })}
@@ -300,7 +302,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
 
         <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 mt-4 bg-background pb-2 pt-2 lg:static">
           <form className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2 pl-5 shadow-sm" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
-            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={modeHint[mode]} className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" disabled={streaming} />
+            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={modeHint[mode]} className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"/>
             {streaming ? (
               <Button type="button" variant="outline" size="lg" className="size-11 rounded-full p-0" onClick={stop} aria-label="중지"><Square className="size-4" /></Button>
             ) : (
@@ -316,7 +318,8 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
           sources={sourceOf?.policy ?? []}
           activeRef={activeRef}
           onSelect={setActiveRef}
-          context={sourceOf && sourceTurn !== null ? { query: sourceOf.query, onBack: () => { setSourceTurn(null); setActiveRef(current?.policy[0]?.ref ?? null); } } : undefined}
+          current={!!sourceOf && !sourceOf.fromHistory && sourceOf.status === "done"}
+          context={sourceOf ? { query: sourceOf.query, onBack: sourceTurn !== null ? () => { setSourceTurn(null); setActiveRef(current?.policy[0]?.ref ?? null); } : undefined } : undefined}
         />
         </div>
       )}
@@ -327,12 +330,9 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
 // ── 검색 내역 패널: 서버 저장분. 누르면 저장된 답을 그대로 다시 연다(재검색 없음) ──
 function HistoryPanel({ history, onPick, onClose }: { history: { items: SearchSession[]; loading: boolean }; onPick: (x: SearchSession) => void; onClose: () => void }) {
   return (
-    <Card className="gap-2 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-ink">검색 내역</div>
-          <p className="text-xs text-ink-muted">이 워크스페이스에서 물어본 질문. 누르면 그때 답을 다시 봅니다</p>
-        </div>
+    <Card className="shrink-0 gap-2 p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold text-ink">검색 내역 <span className="font-normal text-ink-muted">이 워크스페이스에서 물어본 질문. 누르면 그때 답을 다시 봅니다</span></span>
         <button type="button" onClick={onClose} aria-label="닫기" className="rounded p-1 text-ink-muted hover:bg-primary-100"><X className="size-4" /></button>
       </div>
       {history.loading ? <p className="text-xs text-ink-muted">불러오는 중…</p> : history.items.length === 0 ? <p className="text-xs text-ink-muted">아직 기록이 없습니다.</p> : (
@@ -382,10 +382,35 @@ function PipelineBadges({ turn }: { turn: Turn }) {
     </div>
   );
 }
+// ── 근거 확인 표시: 서버가 준 값만으로 세 단계. 점수가 아니라 확인된 사실의 요약 ──
+// 주의: 서버의 인용 검증은 "번호가 실제 근거 목록에 있는가"까지다. 문장 내용이 조문과 맞는지는 보지 않는다
+type TrustLevel = "ok" | "check" | "none";
+const trustLabel: Record<TrustLevel, string> = { ok: "근거 확인됨", check: "확인 필요", none: "근거 없음" };
+const trustTone: Record<TrustLevel, string> = { ok: "bg-success text-white", check: "bg-warn text-white", none: "bg-ref text-white" }; // 진한 바탕 + 흰 글씨
+const trustSoft: Record<TrustLevel, string> = { ok: "border-success/30 bg-success-bg", check: "border-warn/30 bg-warn-bg", none: "border-ref/30 bg-ref-bg" }; // 이유 상자 테두리·바탕
+const trustIcon: Record<TrustLevel, LucideIcon> = { ok: CircleCheck, check: TriangleAlert, none: CircleMinus }; // 색을 못 봐도 모양으로 구분
+function trustOf(turn: Turn): { level: TrustLevel; reasons: { ok: boolean; text: string }[] } {
+  const verified = turn.citations?.verified ?? [];
+  const unverified = turn.citations?.unverified ?? [];
+  if (verified.length === 0) return { level: "none", reasons: [{ ok: false, text: "답변에 확인된 근거 번호가 없습니다" }] };
+  const cited = (turn.chain?.nodes ?? []).filter((n) => verified.includes(n.ref));
+  const reasons = [
+    { ok: true, text: `인용한 근거 ${verified.length}건이 찾은 근거 목록과 일치` },
+    ...(unverified.length ? [{ ok: false, text: `근거 목록에 없는 번호 ${unverified.length}건` }] : []),
+    ...(turn.done?.truncated ? [{ ok: false, text: "답변이 길어 중간에 잘렸습니다" }] : []),
+    ...cited.filter((n) => n.status === "deprecated").map((n) => ({ ok: false, text: `기록 ${n.ref.slice(1)}: 폐기된 기록입니다` })),
+    ...cited.filter((n) => (n.policy ?? []).some((p) => p.revision)).map((n) => ({ ok: false, text: `기록 ${n.ref.slice(1)}: 개정 전 규정을 따른 사례입니다` })),
+    ...(turn.fromHistory ? [{ ok: false, text: "예전에 받은 답변입니다. 그 뒤 규정이 바뀌었는지는 확인하지 않았습니다" }] : []),
+  ];
+  return { level: reasons.some((r) => !r.ok) ? "check" : "ok", reasons };
+}
 
 // ── 답변 카드 ───────────────────────────────────────────────────────────────
-function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, onCite, onVote, onRetry }: { turn: Turn; wsId: number; collapsed: boolean; highlighted: boolean; activeNode: number | null; onOpen: () => void; onCite: (ref: string) => void; onVote: (v: 1 | -1 | null) => void; onRetry?: () => void }) {
+function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, activeRef, onOpen, onCite, onVote, onRetry }: { turn: Turn; wsId: number; collapsed: boolean; highlighted: boolean; activeNode: number | null; activeRef: string | null; onOpen: () => void; onCite: (ref: string) => void; onVote: (v: 1 | -1 | null) => void; onRetry?: () => void }) {
   const [open, setOpen] = useState(!collapsed);
+  const [why, setWhy] = useState(false); // 근거 확인 표시의 이유 펼침
+  const trust = trustOf(turn);
+  const TrustIcon = trustIcon[trust.level];
   const c = turn.citations;
   const tone = (ref: string) => (!c ? "neutral" : c.verified.includes(ref) ? "primary" : c.unverified.includes(ref) ? "warn" : "neutral");
   const chain: Chain | null = turn.chain ? chainFromEvent(turn.chain) : null;
@@ -405,13 +430,14 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
       if (!line.trim()) return null;
       return (
         <p key={i} className="text-sm leading-relaxed text-ink">
-          {line.split(/(\[[PN]\d+\])/g).map((seg, j) => {
+          {line.split(/(\[[PN]\d+\])/g).map((seg, j, segs) => {
             const m = /^\[([PN]\d+)\]$/.exec(seg);
-            if (!m) return <span key={j}>{seg}</span>;
+            if (!m) return <span key={j} className={cn(segs[j + 1] === `[${activeRef}]` && "rounded bg-primary-200 box-decoration-clone px-1 py-0.5")}>{seg}</span>; // 바로 뒤 번호가 고른 근거면 이 문장에 배경
             const unverified = tone(m[1]) === "warn";
+            const picked = m[1] === activeRef && !unverified; // 출처 미확인(주황)은 골라도 경고 색 유지
             return (
               <button key={j} type="button" onClick={() => onCite(m[1])} className="mx-0.5 inline-flex align-middle" title={unverified ? `${describe(m[1])} — 출처 미확인` : describe(m[1])}>
-                <Chip tone={tone(m[1])} className="h-5 px-1.5 text-xs">{m[1].startsWith("P") ? `규정 ${m[1].slice(1)}` : `기록 ${m[1].slice(1)}`}</Chip>
+                <Chip tone={picked ? "dark" : tone(m[1])} className="h-5 px-1.5 text-xs">{m[1].startsWith("P") ? `규정 ${m[1].slice(1)}` : `기록 ${m[1].slice(1)}`}</Chip>
               </button>
             );
           })}
@@ -452,8 +478,8 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
       {turn.policy.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {turn.policy.map((p) => (
-            <button key={p.chunk_id} type="button" onClick={() => onCite(p.ref)} className={cn("rounded-full border px-3 py-1 text-xs transition-colors", c?.verified.includes(p.ref) ? "border-primary-400 bg-primary-50 text-primary-700" : "border-border text-ink-muted")}>
-              규정 {p.ref.slice(1)} · {p.doc_title} {p.version} · {p.article_label.split(" ")[0]}{p.page != null && ` · p.${p.page}`}
+            <button key={p.chunk_id} type="button" onClick={() => onCite(p.ref)} className={cn("rounded-full border px-3 py-1 text-xs transition-colors", p.ref === activeRef ? "border-primary-700 bg-primary-700 text-white" : c?.verified.includes(p.ref) ? "border-primary-400 bg-primary-50 text-primary-700" : "border-border text-ink-muted")}>
+              규정 {p.ref.slice(1)} · {p.doc_title} {p.version} · {shortArticle(p.article_label)}{p.page != null && ` · p.${p.page}`}
             </button>
           ))}
         </div>
@@ -479,9 +505,11 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
       )}
 
       {turn.status === "done" && (
+        <>
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4 text-xs">
-          <Chip tone={c?.verified.length ? "primary" : "neutral"} title="답변 속 번호가 실제 근거와 맞는지 대조한 결과">근거 {c?.verified.length ?? 0}건 확인됨</Chip>
-          {!!c?.unverified.length && <Chip tone="warn" title="답변에 적힌 번호인데 찾은 근거 목록에 없음">근거 미확인 {c.unverified.length}건</Chip>}
+          <button type="button" onClick={() => setWhy((v) => !v)} aria-expanded={why} title="눌러서 판정 이유 보기" className={cn("inline-flex h-7 items-center gap-1.5 rounded-full px-3 font-semibold", trustTone[trust.level])}>
+            <TrustIcon className="size-3.5" aria-hidden />{trustLabel[trust.level]}<ChevronDown className={cn("size-3 transition-transform", why && "rotate-180")} />
+          </button>
           {turn.mode === "dag_only" && <Chip>규정 검색 안 함</Chip>}
           <span className="ml-auto flex items-center gap-1.5">
             <span className="text-ink-muted">이 답이 문제 해결에</span>
@@ -489,7 +517,23 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, onOpen, on
             <Button variant="outline" size="xs" onClick={() => onVote(turn.vote === -1 ? null : -1)} className={cn(turn.vote === -1 && "border-fail bg-fail-bg text-fail")}>부족했어요</Button>
           </span>
         </div>
-      )}
-    </Card>
+        {why && (
+          <div className={cn("mt-3 rounded-xl border px-4 py-3", trustSoft[trust.level])}>
+            <ul className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
+              {trust.reasons.map((r, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  {r.ok ? <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : trust.level === "none" ? <CircleMinus className="mt-0.5 size-4 shrink-0 text-ref" aria-hidden /> : <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />}
+                  {r.text}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2.5 flex items-start gap-2 border-t border-ink/10 pt-2.5 text-xs text-ref">
+              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />번호가 실제 근거 목록에 있는지만 확인합니다. 문장 내용이 조문과 맞는지는 번호를 눌러 직접 확인해 주세요.
+            </p>
+          </div>        
+        )}
+        </>
+      )}    
+      </Card>
   );
 }
