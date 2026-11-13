@@ -124,6 +124,7 @@ export function ChainBlock({ chain, compact = false, selectedId }: { chain: Chai
   return (
     <div ref={ref} className="min-w-0">
       {fits ? (
+        
         <div className="flex items-start gap-3">
           {depths.map((d, i) => (
             <div key={d} className="flex items-start gap-3">

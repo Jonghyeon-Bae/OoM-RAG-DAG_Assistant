@@ -202,6 +202,14 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
     return () => clearTimeout(t);
   }, [flash]);
 
+  // AI 요약은 서버가 뒤에서 만든다(2~4초) — 만드는 중이면 5초 뒤 한 번만 다시 읽는다. 다시 읽어도 그대로면(AI 키 없음·자동 생성 끔) 더 부르지 않는다(백엔드 11/11 §2.3)
+  const summaryStatus = chain?.summary_status;
+  useEffect(() => {
+    if (!entryId || (summaryStatus !== "none" && summaryStatus !== "stale" && summaryStatus !== "generating")) return;
+    const t = setTimeout(() => fetchChain(wsId, entryId).then((c) => c && startTransition(() => setChain(c))), 5000);
+    return () => clearTimeout(t);
+  }, [summaryStatus, entryId, wsId]);
+
   useEffect(() => {
     if (!entryId) return; // 빈 워크스페이스: ?entry=0 을 URL에 남기지 않는다
     let alive = true;
@@ -406,15 +414,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
               <span>↳ 기울임 글씨 = 앞 기록에 이어 붙인 이유</span>
             </p>
             {chain.truncated && <p className="mt-2 text-xs text-warn">기록이 많아 {chain.nodes.length}건만 표시했습니다(전체 {chain.total}건). 왼쪽 목록에서 다른 기록을 눌러 그 주변을 볼 수 있습니다.</p>}
-            {chain.summary && (
-              <div className="mt-5 rounded-xl bg-primary-50 p-4 sm:mt-6 sm:p-5">
-                <div className="mb-2 flex items-center gap-3">
-                  <Chip tone="dark">AI 요약</Chip>
-                  <span className="text-xs text-ink-muted">이 장애 건의 흐름을 한 단락으로</span>
-                </div>
-                <p className="text-sm leading-relaxed text-ink">{chain.summary}</p>
-              </div>
-            )}
+            {chain.summary && <SummaryBox chain={chain} />}
           </>
         ) : (
           <div className="py-16 text-center text-sm text-ink-muted">이 로그에 이어진 원인·해결이 아직 없습니다. &ldquo;로그 추가&rdquo;로 이어 주세요.</div>
@@ -422,5 +422,23 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
       </Card>
       </div>
     </main>
+  );
+}
+
+// 요약 칸: AI 가 쓴 글일 때만 "AI 요약". 틀 문장(none·AI 키 없음)은 "현황"으로 — 틀 문장에 AI 라벨을 붙이면 장애 건 요약으로 오해한다(#109)
+function SummaryBox({ chain }: { chain: Chain }) {
+  const st = chain.summary_status;
+  const ai = st === "fresh" || st === "stale" || ((st === "generating" || st === "deprecated") && !!chain.summary_at);
+  const at = chain.summary_at ? new Date(chain.summary_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
+  const note = st === "stale" ? "기록이 바뀌어 새 요약을 만드는 중입니다 — 이전 요약" : st === "none" || (st === "generating" && !ai) ? "AI 요약을 만드는 중이거나, 이 서버에서 AI 요약을 쓰지 않습니다" : null;
+  return (
+    <div className="mt-5 rounded-xl bg-primary-50 p-4 sm:mt-6 sm:p-5">
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Chip tone={ai ? "dark" : "neutral"}>{ai ? (st === "stale" ? "이전 AI 요약" : "AI 요약") : "현황"}</Chip>
+        <span className="text-xs text-ink-muted">{ai ? `이 장애 건 전체의 흐름을 한 단락으로${at ? ` · ${at}` : ""}` : "기록 수와 상태"}</span>
+      </div>
+      <p className="text-sm leading-relaxed text-ink">{chain.summary}</p>
+      {note && <p className="mt-2 text-xs text-ink-muted">{note}</p>}
+    </div>
   );
 }
