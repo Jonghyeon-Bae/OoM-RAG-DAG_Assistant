@@ -5,17 +5,21 @@ import type { PolicyRef } from "@/lib/types/domain";
 import { shortArticle } from "@/lib/article";
 
 // JSON 근거 카드 (03 안건 A). 청크 텍스트를 ①②③ 항 단위로 쪼개 전부 하이라이트. react-pdf 원문은 Tier 2.
-export function SourceViewer({ sources, activeRef, onSelect, context, current }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void; context?: { query: string; onBack?: () => void }; current?: boolean }) {
+// bare: 근거 창(폰) 안에 넣을 때 — 바깥 테두리와 제목 줄을 뺀다(창에 이미 제목이 있다)
+// onOpenFile: PDF 원문 보기를 여는 함수. 넘기지 않으면 "원문 전체 보기" 버튼이 꺼진 채로 남는다
+export function SourceViewer({ sources, activeRef, onSelect, context, current, bare, onOpenFile }: { sources: PolicyRef[]; activeRef: string | null; onSelect: (ref: string) => void; context?: { query: string; onBack?: () => void }; current?: boolean; bare?: boolean; onOpenFile?: (source: PolicyRef) => void }) {
   const active = sources.find((s) => s.ref === activeRef) ?? sources[0];
   const clauses = active ? active.text.split(/(?=[①②③④⑤⑥⑦⑧⑨])/).map((s) => s.trim()).filter(Boolean) : [];
 
   return (
     // 오른쪽 패널: 흰 바탕 + 테두리 + 왼쪽 강조선으로 대화 영역과 구분, 스크롤해도 따라오게 sticky
-    <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm">
-      <div className="flex items-center justify-between border-b border-border pb-3">
-        <h2 className="font-bold text-ink">규정 원문</h2>
-        <Chip tone="primary" className="text-xs" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
-      </div>
+    <aside className={cn("flex min-w-0 flex-col gap-3", !bare && "overflow-y-auto rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]")}>
+      {!bare && (
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <h2 className="font-bold text-ink">규정 원문</h2>
+          <Chip tone="primary" className="text-xs" title="답변에 인용된 조항을 항 단위로 보여줍니다">인용된 조항</Chip>
+        </div>
+      )}
 
       {context && (
         <div className={cn("flex items-start gap-2 rounded-lg px-3 py-2 text-xs text-ink", context.onBack ? "bg-warn-bg/60" : "bg-primary-100")}>
@@ -48,8 +52,9 @@ export function SourceViewer({ sources, activeRef, onSelect, context, current }:
               {active.page != null && <div className="text-xs text-ink-muted">p.{active.page}</div>}
             </div>
           )}
-          {/* TODO Tier 2: GET /api/documents/{doc_id}/file → react-pdf 모달 */}
-          <Button variant="outline" size="lg" className="h-12 w-full" disabled title="Tier 2 — react-pdf 원문 보기">원문 전체 보기</Button>
+          {/* 원문 전체 보기: onOpenFile 이 규정 원문 창(PolicyDocDialog)을 연다. 지금은 문서의 글 전체를 보여 주고,
+              문서가 PDF 로 확정되면 그 창의 본문만 PDF 로 바꾼다 (Tier 2). onOpenFile 을 넘기지 않으면 버튼이 꺼진다 */}
+          <Button variant="outline" size="lg" className="h-12 w-full" disabled={!onOpenFile || !active} onClick={() => { if (active) onOpenFile?.(active); }} title="문서 전체에서 이 조문 보기">원문 전체 보기</Button>
         </>
       )}
     </aside>
