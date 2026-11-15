@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Chip, Field, cn } from "@/components/ui";
 import { downloadUploadFile, fetchUpload, fetchUploads, uploadAction, uploadPolicy } from "@/lib/api/client";
 import type { PolicyDocument, PolicyUpload, UploadStatus } from "@/lib/types/domain";
+import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
 
 // 규정 파일 올리기 → (AI 워커) 자동 변환 → 검수(변환본 확인·수정) → 승인 → (AI 워커) 등록 (백엔드 #44, #109)
 // 상태: converting → review ⇄(변환본 저장 시 converting) → indexing → approved / rejected / failed → retry
@@ -27,6 +28,7 @@ export function UploadsPanel({ wsId, initial, docs, canUpload, companyAdmin, onA
   const [items, setItems] = useState(initial);
   const [openId, setOpenId] = useState<number | null>(initial.find((u) => u.status === "review")?.id ?? null);
   const anyWorking = items.some((u) => working(u.status));
+  const [sheetOpen, setSheetOpen] = useState(false); // 폰: 검수 상세는 창으로(UX-005 §3-3)
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; }, [items]);
 
@@ -42,7 +44,7 @@ export function UploadsPanel({ wsId, initial, docs, canUpload, companyAdmin, onA
     return () => clearInterval(t);
   }, [anyWorking, wsId, onApproved]);
 
-  const added = (u: PolicyUpload) => { setItems((p) => [u, ...p]); setOpenId(u.id); };
+  const added = (u: PolicyUpload) => { setItems((p) => [u, ...p]); setOpenId(u.id); if (isNarrow()) setSheetOpen(true); };
   const changed = (u: PolicyUpload) => setItems((p) => p.map((x) => (x.id === u.id ? { ...x, ...u, markdown: null } : x)));
 
   return (
@@ -59,7 +61,7 @@ export function UploadsPanel({ wsId, initial, docs, canUpload, companyAdmin, onA
           <ul className="divide-y divide-border">
             {items.map((u) => (
               <li key={u.id}>
-                <button type="button" onClick={() => setOpenId(u.id)} className={cn("flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-primary-50", openId === u.id && "bg-primary-50")}>
+                <button type="button" onClick={() => { setOpenId(u.id); if (isNarrow()) setSheetOpen(true); }} className={cn("flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-primary-50", openId === u.id && "bg-primary-50")}>
                   <span className="flex flex-wrap items-center gap-1.5">
                     <Chip tone={statusTone[u.status]} className="h-5 text-xs">{working(u.status) && <Loader2 className="mr-1 size-3 animate-spin" />}{statusLabel[u.status]}</Chip>
                     <span className="text-sm font-medium text-ink">{u.title} {u.version}</span>
@@ -72,9 +74,14 @@ export function UploadsPanel({ wsId, initial, docs, canUpload, companyAdmin, onA
           </ul>
         </Card>
       </div>
-      {openId ? <UploadDetail key={openId} wsId={wsId} id={openId} onChanged={changed} onApproved={onApproved} /> : (
-        <Card className="p-8 text-center text-sm text-ink-muted">왼쪽에서 파일을 고르면 변환 결과를 검수할 수 있습니다.</Card>
-      )}
+      <div className="hidden min-w-0 lg:block">
+        {openId ? <UploadDetail key={openId} wsId={wsId} id={openId} onChanged={changed} onApproved={onApproved} /> : (
+          <Card className="p-8 text-center text-sm text-ink-muted">왼쪽에서 파일을 고르면 변환 결과를 검수할 수 있습니다.</Card>
+        )}
+      </div>
+      <ResponsiveSheet open={sheetOpen && !!openId} onClose={() => setSheetOpen(false)} title="변환 결과 검수" description={items.find((u) => u.id === openId)?.original_name}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{sheetOpen && openId && <UploadDetail key={`s-${openId}`} wsId={wsId} id={openId} onChanged={changed} onApproved={onApproved} />}</div>
+      </ResponsiveSheet>
     </div>
   );
 }
