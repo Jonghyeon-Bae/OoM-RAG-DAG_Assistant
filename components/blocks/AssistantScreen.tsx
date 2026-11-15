@@ -1,17 +1,19 @@
 "use client";
 import { useEffect, useReducer, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUp, ChevronDown, Loader2, Square, ExternalLink, RotateCcw, History, X, CircleCheck, TriangleAlert, CircleMinus, Check, Info, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUp, ChevronDown, Loader2, Square, ExternalLink, RotateCcw, History, X, CircleCheck, TriangleAlert, CircleMinus, Check, Info, FileText, GitBranch, BookOpen, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Chip, cn } from "@/components/ui";
 import { ChainBlock } from "@/components/blocks/ChainBlock";
 import { SourceViewer } from "@/components/blocks/SourceViewer";
+import { EvidenceBody, EvidenceSheet, type EvidenceTab } from "@/components/blocks/EvidenceSheet";
+import { PolicyDocDialog } from "@/components/blocks/PolicyDocDialog";
 import { fetchSessions, patchSessionScore, streamChat } from "@/lib/api/client";
 import { modeOf, type WsMode } from "@/lib/mode";
-import type { Chain, ChainEvent, ChatEvent, CitationsEvent, DoneEvent, Intent, Mode, PolicyRef, SearchSession, StageNode, StageStatus, Workspace } from "@/lib/types/domain";
 import { shortArticle } from "@/lib/article";
+import type { Chain, ChainEvent, ChatEvent, CitationsEvent, DoneEvent, Intent, Mode, PolicyRef, SearchSession, StageNode, StageStatus, Workspace } from "@/lib/types/domain";
 
 // ── 한 질의(턴)의 상태: SSE 이벤트 9종이 차례로 채운다. 실서버에서는 턴 1개 = search_sessions 1행 ──
 type Status = "idle" | "streaming" | "done" | "error";
@@ -126,20 +128,20 @@ const chainFromEvent = (e: ChainEvent): Chain => ({
   })),
 });
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-
+const isNarrow = () => window.matchMedia("(max-width: 1023px)").matches; // 폰·태블릿(오른쪽 칸이 없는 폭)인가
 export function AssistantScreen({ ws }: { ws: Workspace }) {
   const [state, dispatch] = useReducer(reducer, { turns: [] });
   const [input, setInput] = useState("");
   const [activeRef, setActiveRef] = useState<string | null>(null);
   const [activeNode, setActiveNode] = useState<number | null>(null);
   const [sourceTurn, setSourceTurn] = useState<number | null>(null); // 규정 원문 패널이 보여줄 턴. null = 마지막 턴
+  const [sheet, setSheet] = useState<{ open: boolean; tab: EvidenceTab }>({ open: false, tab: "policy" }); // tab = 근거 탭(PC 오른쪽 칸과 폰 근거 창이 같이 쓴다) · open = 폰 근거 창이 열렸는가
+  const [doc, setDoc] = useState<{ open: boolean; source: PolicyRef | null }>({ open: false, source: null }); // 규정 원문 창(반투명). 닫을 때도 문서는 그대로 둔다(닫히는 동안 내용이 사라지지 않게)
   const [history, setHistory] = useState<{ open: boolean; items: SearchSession[]; loading: boolean }>({ open: false, items: [], loading: false });
   const ctrl = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const srcRef = useRef<HTMLDivElement>(null); // 1열(~1023): 규정 마커를 누르면 아래 원문 패널로 이동
   const endRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true); // 사용자가 위로 올려 읽는 중이면 자동 스크롤을 멈춘다
-  const policyMode = ws.policy_enabled; // 규정 원문 패널 유무
   const mode = modeOf(ws);
   const current = state.turns[state.turns.length - 1];
   const streaming = current?.status === "streaming";
@@ -228,19 +230,43 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
     setSourceTurn(index === state.turns.length - 1 ? null : index);
     if (ref.startsWith("P")) {
       setActiveRef(ref);
-      if (window.matchMedia("(max-width: 1023px)").matches) setTimeout(() => srcRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+      setSheet((s) => ({ ...s, tab: "policy" })); // 고르기만 한다(답변 속 문장과 목록이 강조된다). PC 는 오른쪽 칸이 그 조문으로 바뀐다. 창은 열지 않는다 — 원문은 "규정 원문 보기" 버튼으로
       return;
     }
     const node = turn.chain?.nodes.find((n) => n.ref === ref);
-    if (node) setActiveNode(node.id);
+    if (node) { setActiveNode(node.id); setSheet({ open: isNarrow(), tab: "flow" }); }
   };
   const sourceIndex = sourceTurn ?? state.turns.length - 1;
   const sourceOf = state.turns[sourceIndex];
   const shownRef = activeRef ?? sourceOf?.policy[0]?.ref ?? null; // 패널이 실제로 보여 주는 근거 번호 (고른 게 없으면 첫 근거)
-
+  // 규정 원문 창(반투명) 열기. 지금은 문서의 글 전체, 문서가 PDF 로 확정되면 PDF (PolicyDocDialog 안에서 바꾼다)
+  const openDoc = (source: PolicyRef) => setDoc({ open: true, source });
+  // 답변 아래 버튼: 그 답변의 근거를 연다. 다른 답변의 근거로 바뀔 때만 고른 조문·기록을 처음으로 되돌린다
+  const openEvidence = (index: number, turn: Turn, what: EvidenceTab | "doc") => {
+    const same = index === sourceIndex;
+    if (!same) { setActiveRef(turn.policy[0]?.ref ?? null); setActiveNode(null); }
+    setSourceTurn(index === state.turns.length - 1 ? null : index);
+    if (what === "doc") {
+      // "원문 전체 보기"(폰·PC 공통): 문서 원문 창(반투명)을 연다. 고른 조문이 있으면 그 조문을, 없으면 첫 조문을 표시한다
+      const source = (same ? turn.policy.find((p) => p.ref === activeRef) : undefined) ?? turn.policy[0];
+      if (source) openDoc(source);
+      setSheet((s) => ({ ...s, tab: "policy" })); // 창 뒤의 오른쪽 칸도 규정 탭으로 맞춰 둔다
+      return;
+    }
+    setSheet({ open: isNarrow(), tab: what }); // "해결 흐름 보기" · "규정 원문 보기" — PC: 오른쪽 칸의 탭을 바꾼다 · 폰: 근거 창을 그 탭으로 연다
+  };
+  // 근거 내용: PC 의 오른쪽 칸과 폰의 근거 창이 같은 것을 보여 준다
+  const evidence = {
+    tab: sheet.tab,
+    onTab: (tab: EvidenceTab) => setSheet((s) => ({ ...s, tab })),
+    flowCount: sourceOf?.chain?.nodes.length ?? 0,
+    policyCount: sourceOf?.policy.length ?? 0,
+    flow: sourceOf?.chain ? <FlowView turn={sourceOf} wsId={ws.id} selectedId={activeNode ?? undefined} /> : null,
+    policy: sourceOf?.policy.length ? <SourceViewer bare sources={sourceOf.policy} activeRef={activeRef} onSelect={setActiveRef} current={!sourceOf.fromHistory && sourceOf.status === "done"} onOpenFile={openDoc} /> : null,
+  };
   return (
-    <main className={cn("grid flex-1 items-start gap-4 p-3 sm:gap-6 md:p-6 xl:p-8", policyMode ? "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1")}>
-      <section className={cn("flex min-w-0 flex-col lg:h-[calc(100dvh-8rem)] xl:h-[calc(100dvh-9rem)]", !policyMode && "mx-auto w-full max-w-4xl")}>
+    <main className="grid flex-1 items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_600px] xl:p-8">
+      <section className="flex min-w-0 flex-col lg:h-[calc(100dvh-8rem)] xl:h-[calc(100dvh-9rem)]">
         <div ref={listRef} onScroll={onListScroll} className="flex flex-1 flex-col gap-4 lg:min-h-0 lg:overflow-y-auto lg:pr-1">
           {state.turns.length === 0 ? (
             <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center text-sm text-ink-muted">
@@ -272,7 +298,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
                       <span className="mt-1 block text-right text-xs text-white/60">{fmtTime(t.askedAt)}</span>
                     </div>
                     {isLast && <PipelineBadges turn={t} />}
-                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} wsId={ws.id} collapsed={!isLast} highlighted={sourceIndex === i && state.turns.length > 1} activeNode={sourceIndex === i ? activeNode : null} activeRef={sourceIndex === i ? shownRef : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} />
+                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} collapsed={!isLast} highlighted={sourceIndex === i && state.turns.length > 1} activeRef={sourceIndex === i ? shownRef : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onEvidence={(what) => openEvidence(i, t, what)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} />
                   </div>
                 );
               })}
@@ -293,17 +319,26 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
         </div>
       </section>
 
-      {policyMode && (
-        <div ref={srcRef} className={cn("min-w-0 scroll-mt-16 lg:contents", !sourceOf?.policy?.length && "max-lg:hidden")}>{/* 1열에서는 인용된 조항이 있을 때만 */}
-        <SourceViewer
-          sources={sourceOf?.policy ?? []}
-          activeRef={activeRef}
-          onSelect={setActiveRef}
-          current={!!sourceOf && !sourceOf.fromHistory && sourceOf.status === "done"}
-          context={sourceOf ? { query: sourceOf.query, onBack: sourceTurn !== null ? () => { setSourceTurn(null); setActiveRef(current?.policy[0]?.ref ?? null); } : undefined } : undefined}
-        />
+      {/* PC: 오른쪽 "이 답변의 근거" 칸. 폰·태블릿에서는 숨기고 아래 근거 창이 대신한다 */}
+      <aside aria-label="이 답변의 근거" className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border border-l-4 border-l-primary-700 bg-card p-5 shadow-sm max-lg:hidden lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]">
+        <div className="flex items-baseline justify-between gap-3 border-b border-border pb-3">
+          <h2 className="shrink-0 font-bold text-ink">이 답변의 근거</h2>
+          {sourceOf && <span className="truncate text-xs text-ink-muted">질문: {sourceOf.query}</span>}
         </div>
-      )}
+        {sourceTurn !== null && (
+          <div className="flex items-center gap-2 rounded-lg bg-warn-bg/60 px-3 py-2 text-xs text-ink">
+            <span className="min-w-0 flex-1">이전 질문의 근거를 보고 있습니다</span>
+            <button type="button" onClick={() => { setSourceTurn(null); setActiveRef(current?.policy[0]?.ref ?? null); setActiveNode(null); }} className="shrink-0 font-medium text-primary-700 hover:underline">최신으로</button>
+          </div>
+        )}
+        <EvidenceBody {...evidence} empty={<div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-ink-muted">답변의 근거가 여기에 표시됩니다.</div>} />
+      </aside>
+
+      {/* 폰·태블릿: 근거 창. 답변 아래 버튼이나 번호를 누르면 열린다 */}
+      <EvidenceSheet open={sheet.open && !!sourceOf} onClose={() => setSheet((s) => ({ ...s, open: false }))} query={sourceOf?.query ?? ""} {...evidence} />
+
+      {/* 규정 원문 창 (폰·PC 공통, 반투명 배경) */}
+      <PolicyDocDialog wsId={ws.id} open={doc.open} source={doc.source} onClose={() => setDoc((d) => ({ ...d, open: false }))} />
     </main>
   );
 }
@@ -384,7 +419,23 @@ function trustOf(turn: Turn): { level: TrustLevel; reasons: { ok: boolean; text:
 }
 
 // ── 답변 카드 ───────────────────────────────────────────────────────────────
-function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, activeRef, onOpen, onCite, onVote, onRetry }: { turn: Turn; wsId: number; collapsed: boolean; highlighted: boolean; activeNode: number | null; activeRef: string | null; onOpen: () => void; onCite: (ref: string) => void; onVote: (v: 1 | -1 | null) => void; onRetry?: () => void }) {
+// ── 해결 흐름: 답변 카드(PC)와 근거 창(폰)이 같이 쓴다 ─────────────────────────
+function FlowView({ turn, wsId, selectedId }: { turn: Turn; wsId: number; selectedId?: number }) {
+  if (!turn.chain) return null;
+  const chain = chainFromEvent(turn.chain);
+  return (
+    <>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-semibold text-ink-muted">비슷한 장애 건의 해결 흐름 <span className="font-normal">(기록 1부터 순서대로)</span></span>
+        <Link href={`/w/${wsId}/timeline?entry=${chain.entry_id}`} className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline">
+          <ExternalLink className="size-3" /> 타임라인에서 보기
+        </Link>
+      </div>
+      <ChainBlock chain={{ ...chain, nodes: chain.nodes.map((n) => ({ ...n, note: `기록 ${turn.chain!.nodes.find((x) => x.id === n.id)?.ref.slice(1)}` })) }} compact selectedId={selectedId} />
+    </>
+  );
+}
+function AnswerCard({ turn, collapsed, highlighted, activeRef, onOpen, onCite, onEvidence, onVote, onRetry }: { turn: Turn; collapsed: boolean; highlighted: boolean; activeRef: string | null; onOpen: () => void; onCite: (ref: string) => void; onEvidence: (what: EvidenceTab | "doc") => void; onVote: (v: 1 | -1 | null) => void; onRetry?: () => void }) {
   const [open, setOpen] = useState(!collapsed);
   const [why, setWhy] = useState(false); // 근거 확인 표시의 이유 펼침
   const trust = trustOf(turn);
@@ -447,12 +498,7 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, activeRef,
 
       {turn.text ? <div>{render(turn.text)}</div> : turn.status === "streaming" ? <p className="text-sm text-ink-muted">검색 중…</p> : null}
 
-      {(hasP || hasN) && (
-        <p className="mt-3 text-xs text-ink-muted">
-          번호는 답의 근거입니다 — {hasP && <><b>규정 n</b> = 규정 문서의 조항(오른쪽 원문)</>}{hasP && hasN && " · "}{hasN && <><b>기록 n</b> = 아래 해결 흐름의 n번째 기록</>}. 번호를 누르면 해당 위치로 이동합니다.
-        </p>
-      )}
-
+      {/* 찾은 규정 목록: 누르면 그 조문이 근거 칸(폰은 근거 창)에 열린다. 진한 색 = 지금 보고 있는 조문, 파란 테두리 = 답변에 인용된 조문 */}
       {turn.policy.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {turn.policy.map((p) => (
@@ -461,18 +507,36 @@ function AnswerCard({ turn, wsId, collapsed, highlighted, activeNode, activeRef,
             </button>
           ))}
         </div>
+      )}      
+      {/* 근거는 버튼으로 연다 (폰·PC 공통). 있는 근거만 버튼이 나온다 */}
+      {(chain || turn.policy.length > 0) && (
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          {chain && (
+            <button type="button" onClick={() => onEvidence("flow")} className={cn("flex h-14 items-center justify-center gap-2 rounded-xl bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-800 sm:px-6", !turn.policy.length && "col-span-2")}>
+              <GitBranch className="size-5 shrink-0" aria-hidden />
+              <span className="flex flex-col items-start leading-tight"><span className="text-sm font-bold">해결 흐름 보기</span><span className="text-xs text-primary-200">기록 {chain.nodes.length}개</span></span>
+            </button>
+          )}
+          {turn.policy.length > 0 && (
+            <button type="button" onClick={() => onEvidence("policy")} className="flex h-14 items-center justify-center gap-2 rounded-xl bg-primary-700 text-white hover:bg-primary-800 active:bg-primary-800 sm:px-6">
+              <FileText className="size-5 shrink-0" aria-hidden />
+              <span className="flex flex-col items-start leading-tight"><span className="text-sm font-bold">규정 원문 보기</span><span className="text-xs text-primary-200">조문 {turn.policy.length}개</span></span>
+            </button>
+          )}
+          {/* 문서 전체를 반투명 창으로 연다. 위 두 버튼과 하는 일이 달라서 색을 다르게 한다(흰 바탕 + 테두리) */}
+          {turn.policy.length > 0 && (
+            <button type="button" onClick={() => onEvidence("doc")} className={cn("flex h-14 items-center justify-center gap-2 rounded-xl border border-primary-400 bg-card text-primary-700 hover:bg-primary-50 active:bg-primary-100 sm:px-6", chain && "col-span-2")}>
+              <BookOpen className="size-5 shrink-0" aria-hidden />
+              <span className="flex flex-col items-start leading-tight"><span className="text-sm font-bold">원문 전체 보기</span><span className="text-xs text-ink-muted">문서 전체에서 보기</span></span>
+            </button>
+          )}
+        </div>
       )}
 
-      {chain && (
-        <div className="mt-5">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-ink-muted">비슷한 장애 건의 해결 흐름 <span className="font-normal">(기록 1부터 순서대로)</span></span>
-            <Link href={`/w/${wsId}/timeline?entry=${chain.entry_id}`} className="inline-flex items-center gap-1 text-xs text-primary-700 hover:underline">
-              <ExternalLink className="size-3" /> 타임라인에서 보기
-            </Link>
-          </div>
-          <ChainBlock chain={{ ...chain, nodes: chain.nodes.map((n) => ({ ...n, note: `기록 ${turn.chain!.nodes.find((x) => x.id === n.id)?.ref.slice(1)}` })) }} compact selectedId={activeNode ?? undefined} />
-        </div>
+      {(hasP || hasN) && (
+        <p className="mt-3 text-xs text-ink-muted">
+          번호는 답의 근거입니다 — {hasP && <><b>규정 n</b> = 규정 문서의 조항</>}{hasP && hasN && " · "}{hasN && <><b>기록 n</b> = 해결 흐름의 n번째 기록</>}. 번호를 누르면 그 근거가 열립니다.
+        </p>
       )}
 
       {turn.status === "error" && (
