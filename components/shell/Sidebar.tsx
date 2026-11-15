@@ -32,7 +32,7 @@ export function Sidebar({ wsId, policyEnabled, caseEnabled, adminMenu }: { wsId:
     });
   return (
     <>
-      <aside className="sticky top-0 z-40 hidden h-screen shrink-0 flex-col border-r border-border bg-sidebar lg:flex lg:w-[72px] xl:w-60">
+      <aside className="sticky top-0 z-40 hidden h-screen shrink-0 flex-col border-r border-border bg-sidebar lg:flex lg:w-[72px] xl:w-60 print:!hidden">
         <Link href="/" className="flex h-20 items-center justify-center gap-2.5 xl:justify-start xl:px-6" title="OoM Assist">
           <span className="flex size-8 items-center justify-center rounded-full bg-primary-700 text-sm font-bold text-white">O</span>
           <span className="hidden text-lg font-bold text-ink xl:inline">OoM Assist</span>
@@ -65,7 +65,7 @@ export function Sidebar({ wsId, policyEnabled, caseEnabled, adminMenu }: { wsId:
       </aside>
 
       {/* 하단 탭 바: 휴대폰·태블릿. 쓸 수 없는 메뉴는 터치에서 이유를 볼 수 없으므로 숨긴다 */}
-      <nav aria-label="주 메뉴" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-sidebar pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav aria-label="주 메뉴" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-sidebar pb-[env(safe-area-inset-bottom)] lg:hidden print:hidden">
         <ul className="flex h-16">
           {items.filter((item) => item.why === null).map((item) => {
             const Icon = item.icon;

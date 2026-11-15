@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch } from "lucide-react";
+import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -364,6 +364,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       <Button variant="outline" size="xs" onClick={() => resolve(g.root, true)} title={g.hasSuccess ? "이 장애 건을 완료 처리" : "해결 로그가 없어 완료 사유를 묻습니다"} className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
                     )}
                     <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><Plus className="size-3" /> 로그 추가</Link>
+                    {g.root.type !== "ref" && <Link href={`/w/${wsId}/reports/${g.root.id}`} title="이 장애 건의 보고서(템플릿 R1)" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><FileText className="size-3" /> 보고서</Link>}
                     <Button size="xs" className="lg:hidden" onClick={() => { select(g.root.id); setSheetOpen(true); }}><GitBranch className="size-3" /> 해결 흐름 보기</Button>
                     {g.root.id === entryId && (
                       <div className="flex gap-1.5 max-lg:hidden">
@@ -464,6 +465,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       <Button variant="outline" size="xs" onClick={() => resolve(entry, true)} className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
                     )}
                     <Link href={`/w/${wsId}/logs/new?parent=${entry.id}`} className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><Plus className="size-3" /> 로그 추가</Link>
+                    {entry.type !== "ref" && <Link href={`/w/${wsId}/reports/${entry.id}`} className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><FileText className="size-3" /> 보고서</Link>}
                     <Button variant="outline" size="xs" onClick={() => refine(entry.id)} disabled={busyId === entry.id}><RefreshCw className={cn("size-3", (entry.refine_status === "pending" || entry.refine_status === "processing") && "animate-spin")} /> 다시 정리</Button>
                     {entry.status === "deprecated" ? (
                       <Button variant="outline" size="xs" onClick={() => setStatus(entry.id, "active")} disabled={busyId === entry.id}><RotateCcw className="size-3" /> 복원</Button>
