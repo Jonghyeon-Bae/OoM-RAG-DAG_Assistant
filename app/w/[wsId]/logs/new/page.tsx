@@ -11,7 +11,7 @@ async function Content({ params, searchParams }: { params: Promise<{ wsId: strin
   if (!ws.case_enabled) return (<><Header title="업무로그 등록" subtitle="짧게 적어도 됩니다. AI가 에러 코드·키워드·요약을 뽑아 검색되게 만듭니다" ws={ws} /><CaseOff wsId={ws.id} /></>);
   const { parent } = await searchParams;
   const [recent, weekly, { items }, nonce] = await Promise.all([getRecentLogs(ws.id, 8), getWeeklyCount(ws.id), getLogs(ws.id), requestNonce()]);
-  const initialPreview = parent ? await getChain(ws.id, Number(parent)) : null;
+  const initialPreview = parent ? await getChain(ws.id, Number(parent), { summarize: false }) : null;
   return (
     <>
       <Header title="업무로그 등록" subtitle="짧게 적어도 됩니다. AI가 에러 코드·키워드·요약을 뽑아 검색되게 만듭니다" ws={ws} right={<WeeklyChip initial={weekly} />} />

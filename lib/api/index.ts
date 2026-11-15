@@ -1,7 +1,7 @@
 // 데이터 접근 단일 지점 (서버 컴포넌트용). Spring /api/v1 을 호출한다. 목업 store·mocks 의존 없음.
 // 함수 이름·반환 모양은 목업 때와 같게 유지 → page.tsx 는 고치지 않는다
 import { connection } from "next/server";
-import type { Workspace, Member, ManageableWorkspace, RevisionImpact, LogNode, LogCounts, Chain, DashboardSummary, PolicyDocument, DocEvent } from "@/lib/types/domain";
+import type { Workspace, Member, ManageableWorkspace, RevisionImpact, LogNode, LogCounts, Chain, DashboardSummary, PolicyDocument, DocEvent, PolicyUpload } from "@/lib/types/domain";
 import { serverGet, serverGetOrNull } from "@/lib/api/server";
 
 // 워크스페이스 — 로그인 상태면 내가 소속된 곳, 로그인 전이면 부서 목록 (GET /workspaces 는 로그인 없이 열림)
@@ -23,9 +23,9 @@ export async function getRecentLogs(wsId: number, limit = 5): Promise<LogNode[]>
 export async function getWeeklyCount(wsId: number): Promise<number> {
   return (await serverGet<{ count: number }>("/logs/weekly-count", wsId)).count;
 }
-export async function getChain(wsId: number, entryId: number): Promise<Chain | null> {
+export async function getChain(wsId: number, entryId: number, opts?: { summarize?: boolean }): Promise<Chain | null> {
   if (!entryId) return null; // 로그가 하나도 없는 워크스페이스
-  return serverGetOrNull<Chain>(`/chains/${entryId}`, wsId);
+  return serverGetOrNull<Chain>(`/chains/${entryId}${opts?.summarize === false ? "?summarize=false" : ""}`, wsId);
 }
 
 // 대시보드 — 집계는 전부 서버
@@ -33,12 +33,15 @@ export async function getDashboardSummary(wsId: number): Promise<DashboardSummar
   return serverGet("/dashboard/summary", wsId);
 }
 
-// 규정 문서 — 백엔드 API 는 게이트(11/06) 뒤. 그때까지 빈 목록 (메뉴도 비활성)
-export async function getDocuments(_wsId: number): Promise<PolicyDocument[]> {
-  return [];
+// 규정 문서 (백엔드 #37 — 이 부서 + 상위 전사 공통). 404 면 빈 목록
+export async function getDocuments(wsId: number): Promise<PolicyDocument[]> {
+  return (await serverGetOrNull<PolicyDocument[]>("/documents", wsId)) ?? [];
 }
-export async function getDocumentEvents(_wsId: number): Promise<DocEvent[]> {
-  return [];
+export async function getDocumentEvents(wsId: number): Promise<DocEvent[]> {
+  return (await serverGetOrNull<DocEvent[]>("/documents/events", wsId)) ?? [];
+}
+export async function getUploads(wsId: number): Promise<PolicyUpload[]> {
+  return (await serverGetOrNull<PolicyUpload[]>("/documents/uploads", wsId)) ?? [];
 }
 
 // 요청마다 다른 값. 같은 URL 재진입 시 클라이언트 컴포넌트를 새로 마운트하는 key 용 (API 아님)

@@ -70,11 +70,15 @@ export interface ChainNode {
 
 export interface ChainEdge { parent_id: number; child_id: number; reason: string | null } // reason = 이 상위에 이어 붙인 이유
 
+// 장애 건 AI 요약 상태 (백엔드 #47, 11/11 전달 §2.2). fresh 최신 / stale 낡음(새로 만드는 중) / none 없음(틀 문장) / generating 생성 중 / deprecated 폐기 건
+export type SummaryStatus = "fresh" | "stale" | "generating" | "none" | "deprecated";
 export interface Chain {
   entry_id: number;
   nodes: ChainNode[];
   edges: ChainEdge[];
-  summary: string | null;
+  summary: string | null; // 실제로는 늘 문자열 — AI 요약 또는 틀 문장 "{제목} 장애 건: 기록 N건, 해결 M건, 완료"
+  summary_status?: SummaryStatus | null; // 어시스턴트 chain 이벤트로 만든 Chain 에는 없다
+  summary_at?: string | null;
   total: number;
   truncated: boolean;
 }
@@ -180,27 +184,67 @@ export interface PolicyDocument {
   slug: string;
   title: string;
   version: string;
-  source_type: SourceType; // TODO:04 (BE-REQ-001 S7)
+  doc_type: string | null;
+  source_type: SourceType; // 업로드 docx·md·txt 는 markdown, hwpx 는 hwp
   has_file: boolean;
   status: DocStatus;
   retired_at: string | null;
   retire_reason: string | null;
-  visibility: "company" | "dept"; // TODO:04 (S5)
-  chunk_count: number;
-  indexed_at: string;
-  uploaded_by: string; // 적재 실행자(스크립트 실행 계정 또는 1.1 업로드 UI 사용자)
-  uploaded_at: string;
-  approved_by: string | null; // 1.1 검수 승인자. 1.0은 NULL
   retired_by: string | null;
+  superseded_by: number | null; // 이 문서를 대체한 새 판 — 복원 불가(SUPERSEDED)
+  visibility: "company" | "dept";
+  chunk_count: number;
+  indexed_at: string | null;
+  uploaded_by: string | null; // 적재 실행자(스크립트) 또는 업로드한 사람
+  uploaded_at: string | null;
+  approved_by: string | null; // 업로드 검수 승인자. 스크립트 적재는 null
+  can_manage: boolean; // 요청자가 폐기·복원·삭제할 수 있는가(문서 ws 또는 상위 admin)
+}
+
+// 규정 파일 업로드 → 자동 변환 → 검수 → 승인 (PolicyUploadController, 백엔드 #44)
+export type UploadStatus = "converting" | "review" | "indexing" | "approved" | "rejected" | "failed";
+export type UploadFormat = "pdf" | "hwp" | "hwpx" | "docx" | "md" | "txt";
+export interface UploadReport {
+  extract?: { format?: string; pages?: number; ocr_pages?: number[] };
+  article_count?: number;
+  articles?: { label: string; chars: number; head: string; article: boolean }[];
+  warnings?: string[];
+  ocr_suspects?: { line: number; text: string }[];
+  indexed?: { chunks: number; retired: unknown };
+}
+export interface PolicyUpload {
+  id: number;
+  workspace_id: number;
+  status: UploadStatus;
+  original_name: string;
+  format: UploadFormat;
+  size_bytes: number;
+  sha256: string;
+  slug: string;
+  title: string;
+  version: string;
+  doc_type: string | null;
+  supersedes: string | null;
+  report: UploadReport;
+  error: string | null;
+  reject_reason: string | null;
+  document_id: number | null;
+  uploaded_by: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  can_manage: boolean;
+  markdown: string | null; // 상세에서만
 }
 
 export type DocEventAction = "uploaded" | "indexed" | "superseded" | "retired" | "restored" | "deleted";
 export interface DocEvent {
   id: number;
   workspace_id: number;
-  document_id: number;
-  document_label: string; // "제목 vX" — 삭제된 문서의 이력도 읽히도록 비정규화
-  action: DocEventAction;
+  document_id: number | null;
+  document_label: string | null; // "제목 vX" — 삭제된 문서의 이력도 읽히도록 비정규화
+  action: DocEventAction | string;
   actor: string;
   source: "script" | "ui";
   reason: string | null;

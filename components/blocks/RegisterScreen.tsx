@@ -48,7 +48,7 @@ export function RegisterScreen({ wsId, candidates: initialCandidates, initialRec
             setCurrentId(n.id);
             window.dispatchEvent(new Event(LOG_CREATED_EVENT));
             setToast({ message: `"${n.title}" 등록됨 — AI가 정리를 시작합니다`, href: `/w/${wsId}/timeline?entry=${n.id}` });
-            const [fresh, chain] = await Promise.all([fetchLogs(wsId), fetchChain(wsId, n.root_id)]);
+            const [fresh, chain] = await Promise.all([fetchLogs(wsId), fetchChain(wsId, n.root_id, { summarize: false })]);
             setCandidates(fresh);
             // 다음 로그는 같은 장애 건에 이어 적을 가능성이 높다 → 방금 등록한 로그의 장애 건을 미리 고른 상태(잠금 요약)로 시작
             setNextParent(String(n.root_id));

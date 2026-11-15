@@ -76,7 +76,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
       setPreview(null);
       return;
     }
-    fetchChain(wsId, Number(value)).then((c) => setPreview(c));
+    fetchChain(wsId, Number(value), { summarize: false }).then((c) => setPreview(c)); // 미리보기는 요약을 그리지 않는다
   };
 
   const parentNode = candidates.find((c) => String(c.id) === parent);

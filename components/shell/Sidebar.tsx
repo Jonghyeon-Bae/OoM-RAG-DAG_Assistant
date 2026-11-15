@@ -11,7 +11,7 @@ const nav: { href: string; label: string; short: string; icon: LucideIcon; polic
   { href: "timeline", label: "트러블슈팅 타임라인", short: "타임라인", icon: GitBranch, caseOnly: true },
   { href: "logs/new", label: "업무로그 등록", short: "등록", icon: SquarePen, caseOnly: true },
   { href: "dashboard", label: "성과 대시보드", short: "대시보드", icon: LayoutDashboard },
-  { href: "documents", label: "규정 문서 관리", short: "문서", icon: FileText, policyOnly: true, pending: true }, // 백엔드 문서 API 미구현(FE-012 §0)
+  { href: "documents", label: "규정 문서 관리", short: "문서", icon: FileText, policyOnly: true }, // 백엔드 #37·#44 (11/13 연결, #109)
   { href: "admin", label: "관리자", short: "관리", icon: Settings, adminOnly: true }, // 권한 없으면 메뉴 자체를 숨긴다(D-5)
 ];
 

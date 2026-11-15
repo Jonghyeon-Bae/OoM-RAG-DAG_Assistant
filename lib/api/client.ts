@@ -1,7 +1,7 @@
 // 클라이언트 컴포넌트용. 브라우저 → /api/v1 (next.config rewrites → Spring :8080).
 // 일반 요청은 axios, 채팅 SSE 만 fetch (axios 는 브라우저에서 스트림을 조각으로 못 받는다).
 import axios from "axios";
-import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, Member, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
+import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, PolicyUpload, Member, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
@@ -54,6 +54,16 @@ const codeText: Record<string, string> = {
   SELF_DEACTIVATION: "자기 자신의 계정은 비활성화할 수 없습니다",
   LAST_COMPANY_ADMIN: "회사 관리자가 한 명은 있어야 합니다",
   ALREADY_INACTIVE: "이미 비활성화된 계정입니다",
+  // 규정 문서·업로드 (백엔드 #37·#44)
+  SUPERSEDED: "새 판으로 대체된 문서라 복원할 수 없습니다 — 두 판이 함께 검색되기 때문입니다",
+  NOT_RETIRED: "폐기한 문서만 삭제할 수 있습니다",
+  DOCUMENT_IN_USE: "이 문서를 근거로 적은 사례나 이전 판이 있어 삭제할 수 없습니다. 폐기만 해 두세요",
+  SLUG_TAKEN: "이미 쓰는 문서 ID입니다. 다른 ID를 정해 주세요",
+  UNSUPPORTED_FORMAT: "PDF · HWP · HWPX · Word(docx) · MD · TXT만 올릴 수 있습니다",
+  SUPERSEDES_NOT_FOUND: "대체할 문서를 찾지 못했습니다(사용 중인 문서만 대체할 수 있습니다)",
+  NOT_IN_REVIEW: "검수 중인 건만 할 수 있습니다. 화면을 새로 고쳐 주세요",
+  NO_ARTICLES: "변환본에서 조문(제N조·별표·Q)을 하나도 찾지 못해 승인할 수 없습니다. 변환본을 고쳐 주세요",
+  NOT_FAILED: "변환에 실패한 건만 다시 변환할 수 있습니다",
 };
 export type ApiFail = { ok: false; code?: string; message: string };
 const fail = (e: unknown, what: string): ApiFail => {
@@ -62,9 +72,10 @@ const fail = (e: unknown, what: string): ApiFail => {
 };
 
 // ── 로그·체인 ────────────────────────────────────────────────────────────────
-export async function fetchChain(wsId: number, entryId: number): Promise<Chain | null> {
+// summarize:false = 요약을 그리지 않는 화면(등록 미리보기). 서버가 AI 요약 생성을 시작하지 않는다(백엔드 #48, 비용)
+export async function fetchChain(wsId: number, entryId: number, opts?: { summarize?: boolean }): Promise<Chain | null> {
   try {
-    const { data } = await api.get<Chain>(`/chains/${entryId}`, ws(wsId));
+    const { data } = await api.get<Chain>(`/chains/${entryId}${opts?.summarize === false ? "?summarize=false" : ""}`, ws(wsId));
     return data;
   } catch (e) {
     if (httpStatus(e) === 404) return null;
@@ -223,22 +234,31 @@ export async function patchSessionScore(wsId: number, id: number, score: 1 | -1 
   }
 }
 
-// ── 규정 문서 — 백엔드 API 는 게이트(11/06) 뒤. 메뉴 비활성 상태라 지금은 호출되지 않는다 ──
-export async function patchDocStatus(wsId: number, id: number, status: DocStatus, reason?: string): Promise<PolicyDocument | null> {
+// ── 규정 문서 (DocumentController · PolicyUploadController, 백엔드 #37·#44) ──
+export async function fetchDocs(wsId: number): Promise<PolicyDocument[]> {
   try {
-    const { data } = await api.patch<PolicyDocument>(`/documents/${id}`, { status, reason }, ws(wsId));
+    const { data } = await api.get<PolicyDocument[]>("/documents", ws(wsId));
     return data;
   } catch {
-    return null;
+    return [];
   }
 }
 
-export async function deleteDoc(wsId: number, id: number): Promise<{ ok: boolean; message?: string }> {
+export async function patchDocStatus(wsId: number, id: number, status: DocStatus, reason?: string): Promise<{ ok: true; doc: PolicyDocument } | ApiFail> {
+  try {
+    const { data } = await api.patch<PolicyDocument>(`/documents/${id}`, { status, reason }, ws(wsId));
+    return { ok: true, doc: data };
+  } catch (e) {
+    return fail(e, status === "retired" ? "폐기" : "복원");
+  }
+}
+
+export async function deleteDoc(wsId: number, id: number): Promise<{ ok: true } | ApiFail> {
   try {
     await api.delete(`/documents/${id}`, ws(wsId));
     return { ok: true };
   } catch (e) {
-    return { ok: false, message: errBody(e)?.message };
+    return fail(e, "삭제");
   }
 }
 
@@ -257,6 +277,76 @@ export async function fetchDocEvents(wsId: number, documentId?: number): Promise
     return data;
   } catch {
     return [];
+  }
+}
+
+export type UploadInput = { file: File; title: string; version: string; slug: string; doc_type?: string; supersedes?: string; scope: "dept" | "company" };
+export async function uploadPolicy(wsId: number, input: UploadInput): Promise<{ ok: true; upload: PolicyUpload } | ApiFail> {
+  const fd = new FormData();
+  fd.append("file", input.file);
+  fd.append("title", input.title);
+  fd.append("version", input.version);
+  fd.append("slug", input.slug);
+  fd.append("scope", input.scope);
+  if (input.doc_type) fd.append("doc_type", input.doc_type);
+  if (input.supersedes) fd.append("supersedes", input.supersedes);
+  // axios 인스턴스 기본 Content-Type 이 JSON 이라 FormData 를 JSON 으로 바꿔 버린다 → fetch 로 보내 브라우저가 경계(boundary)를 붙이게 한다
+  try {
+    const res = await fetch(`${BASE}/documents/uploads`, { method: "POST", body: fd, credentials: "include", headers: { "X-Workspace-Id": String(wsId) } });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) return { ok: false, code: body?.code, message: (body?.code && codeText[body.code]) ?? body?.message ?? `업로드 실패 (${res.status})` };
+    return { ok: true, upload: body as PolicyUpload };
+  } catch {
+    return { ok: false, message: "업로드 실패 (네트워크)" };
+  }
+}
+
+export async function fetchUploads(wsId: number): Promise<PolicyUpload[]> {
+  try {
+    const { data } = await api.get<PolicyUpload[]>("/documents/uploads", ws(wsId));
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchUpload(wsId: number, id: number): Promise<PolicyUpload | null> {
+  try {
+    const { data } = await api.get<PolicyUpload>(`/documents/uploads/${id}`, ws(wsId));
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// 검수 동작: markdown 저장(→ 재변환) · approve(→ 등록) · reject(사유) · retry(실패 건)
+export async function uploadAction(wsId: number, id: number, action: "markdown" | "approve" | "reject" | "retry", body?: { markdown?: string; reason?: string }): Promise<{ ok: true; upload: PolicyUpload } | ApiFail> {
+  try {
+    const { data } = action === "markdown"
+      ? await api.put<PolicyUpload>(`/documents/uploads/${id}/markdown`, { markdown: body?.markdown }, ws(wsId))
+      : await api.post<PolicyUpload>(`/documents/uploads/${id}/${action}`, action === "reject" ? { reason: body?.reason } : null, ws(wsId));
+    return { ok: true, upload: data };
+  } catch (e) {
+    return fail(e, { markdown: "변환본 저장", approve: "승인", reject: "반려", retry: "다시 변환" }[action]);
+  }
+}
+
+// 원본·검수본 내려받기 — X-Workspace-Id 헤더가 필요해 링크 대신 받아서 저장한다
+export async function downloadUploadFile(wsId: number, id: number, kind: "original" | "markdown", fallbackName: string): Promise<{ ok: true } | ApiFail> {
+  try {
+    const res = await api.get<Blob>(`/documents/uploads/${id}/${kind}`, { ...ws(wsId), responseType: "blob" });
+    const cd = String(res.headers["content-disposition"] ?? "");
+    const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) ?? /filename="?([^";]+)"?/i.exec(cd);
+    const name = m ? decodeURIComponent(m[1]) : fallbackName;
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "내려받기");
   }
 }
 
