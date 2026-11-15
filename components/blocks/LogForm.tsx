@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, GitBranch } from "lucide-react";
+import { ResponsiveSheet } from "@/components/ui/ResponsiveSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,7 +34,8 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
   const [preview, setPreview] = useState<Chain | null>(initialPreview ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [more, setMore] = useState(false); // "더 남기기"(근거 조문) 펼침 — 넣은 조문이 있으면 늘 펼침
+  const [more, setMore] = useState(false);
+  const [flowOpen, setFlowOpen] = useState(false); // 폰: 이어 붙일 흐름은 창으로(UX-005 §3-2) — 폼 가운데 체인이 끼어들지 않게 // "더 남기기"(근거 조문) 펼침 — 넣은 조문이 있으면 늘 펼침
   const [refs, setRefs] = useState<RefDraft[]>([]); // 근거 조문(요청 J). 덜 채운 줄이 있으면 등록을 막는다
   const refsIncomplete = refs.some((x) => !refReady(x));
 
@@ -94,7 +96,11 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
             <TypeBadge type={parentNode.type} />
             <span>이 흐름에 이어집니다 — 새 로그는 <b className="text-ink">{parentNode.title}</b> 다음에 들어갑니다</span>
           </div>
-          <ChainBlock chain={preview} compact selectedId={parentNode.id} />
+          <div className="max-lg:hidden"><ChainBlock chain={preview} compact selectedId={parentNode.id} /></div>
+          <Button type="button" variant="outline" size="xs" className="lg:hidden" onClick={() => setFlowOpen(true)}><GitBranch className="size-3" /> 흐름 보기 ({preview.nodes.length}건)</Button>
+          <ResponsiveSheet open={flowOpen} onClose={() => setFlowOpen(false)} title="이어 붙일 흐름" description={`새 로그는 "${parentNode.title}" 다음에 들어갑니다`}>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain"><ChainBlock chain={preview} compact selectedId={parentNode.id} /></div>
+          </ResponsiveSheet>
         </div>
       )}
 

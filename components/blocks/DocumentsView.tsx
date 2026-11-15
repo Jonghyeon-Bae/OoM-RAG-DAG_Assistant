@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Chip, cn } from "@/components/ui";
 import { deleteDoc, fetchDocChunks, fetchDocEvents, fetchDocs, patchDocStatus } from "@/lib/api/client";
 import { UploadsPanel } from "@/components/blocks/documents/UploadsPanel";
+import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
+import { History } from "lucide-react";
 import type { DocEvent, DocStatus, PolicyChunk, PolicyDocument, PolicyUpload, SourceType } from "@/lib/types/domain";
 
 // 규정 문서 관리 (백엔드 #37·#44, #109). 탭: 등록된 문서(폐기·복원·삭제·조문·이력) / 올리기·검수(업로드 → 자동 변환 → 검수 → 승인)
@@ -29,6 +31,8 @@ export function DocumentsView({ wsId, initial, initialEvents, initialUploads, ca
   const [busy, setBusy] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ tone: "ok" | "fail"; text: string } | null>(null);
   const pending = initialUploads.filter((u) => u.status === "review").length;
+  // 폰·태블릿: 이력·조문은 버튼으로 여는 창(UX-005 §3-3, #112). PC 는 오른쪽 칸
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // 같은 제목 = 한 규정의 판 묶음 (최신 등록 순)
   const groups = Object.values(docs.reduce<Record<string, PolicyDocument[]>>((acc, d) => ((acc[d.title] ??= []).push(d), acc), {}))
@@ -52,8 +56,50 @@ export function DocumentsView({ wsId, initial, initialEvents, initialUploads, ca
   const restore = (d: PolicyDocument) => run(d.id, () => patchDocStatus(wsId, d.id, "active"), `${d.title} ${d.version} 복원 — 다시 검색됩니다`);
   const retire = (d: PolicyDocument, reason: string) => run(d.id, () => patchDocStatus(wsId, d.id, "retired", reason), `${d.title} ${d.version} 폐기 — 검색에서 빠집니다`);
   const remove = (d: PolicyDocument) => run(d.id, () => deleteDoc(wsId, d.id), `${d.title} ${d.version} 영구 삭제`);
-  const showChunks = async (doc: PolicyDocument) => { setBusy(doc.id); setPanel({ kind: "chunks", doc, items: await fetchDocChunks(wsId, doc.id) }); setBusy(null); };
-  const showEvents = async (doc: PolicyDocument | null) => { setBusy(doc?.id ?? 0); setPanel({ kind: "events", doc, items: await fetchDocEvents(wsId, doc?.id) }); setBusy(null); };
+  const showChunks = async (doc: PolicyDocument) => { setBusy(doc.id); setPanel({ kind: "chunks", doc, items: await fetchDocChunks(wsId, doc.id) }); setBusy(null); if (isNarrow()) setSheetOpen(true); };
+  const showEvents = async (doc: PolicyDocument | null, open = true) => { setBusy(doc?.id ?? 0); setPanel({ kind: "events", doc, items: await fetchDocEvents(wsId, doc?.id) }); setBusy(null); if (open && isNarrow()) setSheetOpen(true); };
+
+  // 이력·조문 본문 — PC 오른쪽 칸과 폰 창이 같이 쓴다
+  const panelBody = (
+    <>
+      {panel.kind === "chunks" ? (
+        <>
+          {/* 제목 줄은 PC 오른쪽 칸에서만 — 폰 창은 창 제목이 같은 말을 한다(겹침 방지, #113). 다른 보기로의 이동은 목록 위 [변경 이력 보기]·문서별 [이력]으로 */}
+          <h3 className="hidden font-semibold text-ink lg:block">조문</h3>
+          <p className="text-xs text-ink-muted"><span className="hidden lg:inline">{panel.doc.title} {panel.doc.version} · </span>{panel.items.length}조각. 조각 ID는 어시스턴트 답변의 출처 표기와 같습니다.</p>
+          <ul className="max-h-[70vh] space-y-2 overflow-auto">
+            {panel.items.map((c) => (
+              <li key={c.id} className="rounded-lg border bg-white p-3 text-sm">
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-xs text-ink-muted"><span>{c.article_label}{c.page != null && ` · p.${c.page}`}</span><span className="font-mono">{c.id}</span></div>
+                <p className="whitespace-pre-line leading-relaxed text-ink">{c.text}</p>
+              </li>
+            ))}
+            {!panel.items.length && <li className="text-sm text-ink-muted">조문이 없습니다.</li>}
+          </ul>
+        </>
+      ) : (
+        <>
+          <div className="hidden lg:block">
+            <h3 className="font-semibold text-ink">{panel.doc ? "문서 이력" : "최근 변경 이력"}</h3>
+            <p className="mt-0.5 text-xs text-ink-muted">{panel.doc ? `${panel.doc.title} ${panel.doc.version}` : "등록·개정 대체·폐기·복원·삭제 기록. 삭제된 문서의 기록도 남습니다."}</p>
+          </div>
+          <ol className="max-h-[70vh] space-y-2 overflow-auto">
+            {panel.items.map((e) => (
+              <li key={e.id} className="rounded-lg border bg-white p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <Chip tone={actionTone[e.action] ?? "neutral"} className="h-5 text-xs">{actionLabel[e.action] ?? e.action}</Chip>
+                  <span className="text-xs tabular-nums text-ink-muted">{fmtAt(e.at)}</span>
+                </div>
+                {!panel.doc && e.document_label && <div className="mt-1 font-medium text-ink">{e.document_label}</div>}
+                <div className="mt-1 text-xs text-ink-muted">{e.actor} · {e.source === "ui" ? "화면" : "스크립트"}{e.reason && ` · ${e.reason}`}</div>
+              </li>
+            ))}
+            {!panel.items.length && <li className="text-sm text-ink-muted">기록이 없습니다.</li>}
+          </ol>
+        </>
+      )}
+    </>
+  );
 
   return (
     <main className="flex flex-col gap-4 p-3 sm:gap-6 md:p-6 xl:p-8">
@@ -76,6 +122,7 @@ export function DocumentsView({ wsId, initial, initialEvents, initialUploads, ca
                 </button>
               ))}
               <span className="text-xs text-ink-muted">이 부서와 전사 공통 규정. 어시스턴트는 &ldquo;사용 중&rdquo;만 검색합니다.</span>
+              <Button size="xs" variant="outline" className="ml-auto" onClick={() => showEvents(null)}><History className="size-3" /> 변경 이력 보기</Button>{/* PC 도 이 버튼으로 오른쪽 칸을 전체 이력으로 되돌린다 */}
             </div>
             {msg && <p role="status" className={cn("rounded-lg px-3 py-2 text-sm", msg.tone === "ok" ? "bg-primary-50 text-ink" : "bg-fail-bg text-fail")}>{msg.text}</p>}
 
@@ -156,51 +203,16 @@ export function DocumentsView({ wsId, initial, initialEvents, initialUploads, ca
             {!docs.length && <Card className="p-8 text-center text-sm text-ink-muted">등록된 규정 문서가 없습니다.{canUpload && " “올리기·검수” 탭에서 규정 파일을 올릴 수 있습니다."}</Card>}
           </section>
 
-          <aside className="min-w-0">
+          <aside className="hidden min-w-0 lg:block">
             <Card className="gap-3 p-4 sm:p-5 lg:sticky lg:top-24">
-              {panel.kind === "chunks" ? (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-semibold text-ink">조문</h3>
-                    <Button size="xs" variant="ghost" onClick={() => showEvents(null)}>변경 이력으로</Button>
-                  </div>
-                  <p className="text-xs text-ink-muted">{panel.doc.title} {panel.doc.version} · {panel.items.length}조각. 조각 ID는 어시스턴트 답변의 출처 표기와 같습니다.</p>
-                  <ul className="max-h-[70vh] space-y-2 overflow-auto">
-                    {panel.items.map((c) => (
-                      <li key={c.id} className="rounded-lg border bg-white p-3 text-sm">
-                        <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-xs text-ink-muted"><span>{c.article_label}{c.page != null && ` · p.${c.page}`}</span><span className="font-mono">{c.id}</span></div>
-                        <p className="whitespace-pre-line leading-relaxed text-ink">{c.text}</p>
-                      </li>
-                    ))}
-                    {!panel.items.length && <li className="text-sm text-ink-muted">조문이 없습니다.</li>}
-                  </ul>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-semibold text-ink">{panel.doc ? "문서 이력" : "최근 변경 이력"}</h3>
-                    {panel.doc && <Button size="xs" variant="ghost" onClick={() => showEvents(null)}>전체 보기</Button>}
-                  </div>
-                  <p className="text-xs text-ink-muted">{panel.doc ? `${panel.doc.title} ${panel.doc.version}` : "등록·개정 대체·폐기·복원·삭제 기록. 삭제된 문서의 기록도 남습니다."}</p>
-                  <ol className="max-h-[70vh] space-y-2 overflow-auto">
-                    {panel.items.map((e) => (
-                      <li key={e.id} className="rounded-lg border bg-white p-3 text-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <Chip tone={actionTone[e.action] ?? "neutral"} className="h-5 text-xs">{actionLabel[e.action] ?? e.action}</Chip>
-                          <span className="text-xs tabular-nums text-ink-muted">{fmtAt(e.at)}</span>
-                        </div>
-                        {!panel.doc && e.document_label && <div className="mt-1 font-medium text-ink">{e.document_label}</div>}
-                        <div className="mt-1 text-xs text-ink-muted">{e.actor} · {e.source === "ui" ? "화면" : "스크립트"}{e.reason && ` · ${e.reason}`}</div>
-                      </li>
-                    ))}
-                    {!panel.items.length && <li className="text-sm text-ink-muted">기록이 없습니다.</li>}
-                  </ol>
-                </>
-              )}
+              {panelBody}
             </Card>
           </aside>
         </div>
       )}
+      <ResponsiveSheet open={sheetOpen && tab === "docs"} onClose={() => setSheetOpen(false)} title={panel.kind === "chunks" ? "조문" : panel.doc ? "문서 이력" : "최근 변경 이력"} description={panel.doc ? `${panel.doc.title} ${panel.doc.version}` : "등록·개정 대체·폐기·복원·삭제 기록"}>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain [&_.max-h-\[70vh\]]:max-h-none">{panelBody}</div>
+      </ResponsiveSheet>
     </main>
   );
 }
