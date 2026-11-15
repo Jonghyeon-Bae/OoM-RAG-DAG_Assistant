@@ -121,3 +121,8 @@
     cursor: pointer;
   }
 }
+/* 보고서 인쇄(#114): A4, 배경 흰색 — 화면 도구·메뉴는 각 요소의 print:hidden */
+@media print {
+  @page { size: A4; margin: 14mm; }
+  html, body { background: #fff !important; }
+}
