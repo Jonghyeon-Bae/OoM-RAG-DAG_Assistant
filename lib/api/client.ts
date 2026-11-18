@@ -2,7 +2,7 @@
 // 일반 요청은 axios, 채팅 SSE 만 fetch (axios 는 브라우저에서 스트림을 조각으로 못 받는다).
 import axios from "axios";
 import type { Report, ReportAudience } from "@/lib/types/report";
-import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, PolicyUpload, Member, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
+import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, PolicyUpload, Member, InactiveUser, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
@@ -430,6 +430,26 @@ export async function reactivateUser(wsId: number, userId: number): Promise<{ ok
     return { ok: true };
   } catch (e) {
     return fail(e, "계정 재활성화");
+  }
+}
+
+// 비활성 계정 목록 — 회사 단위 API 라 부서 헤더와 무관하다(헤더는 다른 호출과 같게 보낸다)
+export async function fetchInactiveUsers(wsId: number): Promise<{ ok: true; items: InactiveUser[] } | ApiFail> {
+  try {
+    const { data } = await api.get<InactiveUser[]>("/users/inactive", ws(wsId));
+    return { ok: true, items: data };
+  } catch (e) {
+    return fail(e, "비활성 계정 조회");
+  }
+}
+
+// 메인 부서 지정(REQ-7) — 로그인 뒤 처음 열릴 부서. 소속 부서만 가능(아니면 400 VALIDATION). 같은 백엔드 PR(feat/admin-account)이라 ACCOUNT_API_READY 를 함께 쓴다
+export async function setPrimaryWorkspace(workspaceId: number): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.patch("/me", { primary_workspace_id: workspaceId });
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "기본 부서 지정");
   }
 }
 

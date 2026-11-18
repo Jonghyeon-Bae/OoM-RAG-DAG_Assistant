@@ -276,6 +276,8 @@ export interface Me {
 // ── 관리자 (UserAdminController · WorkspaceController) ──
 export type MemberRole = "admin" | "member";
 export interface Member { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null; role: MemberRole; locked: boolean }
+// GET /users/inactive — 같은 회사의 비활성 계정(회사 관리자). 멤버 목록에서는 빠지므로 재활성화는 이 목록에서 한다
+export interface InactiveUser { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null }
 export interface InviteInput { employee_no: string; name: string; email?: string; title?: string; role: MemberRole }
 // temp_password: 새 계정일 때만 1회 내려온다(created=false 면 null — 기존 계정을 멤버로만 추가). 화면 밖으로 남기지 않는다
 export interface InviteResult { id: number; employee_no: string; name: string; workspace_id: number; role: MemberRole; created: boolean; temp_password: string | null }

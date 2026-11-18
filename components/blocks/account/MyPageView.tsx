@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Building2, ChevronDown, FileText, Hash, House, IdCard, Info, KeyRound, Mail, ShieldCheck, Briefcase } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +9,12 @@ import { Chip, cn } from "@/components/ui";
 import { PasswordChange } from "@/components/blocks/account/PasswordChange";
 import { PrivacyText } from "@/components/blocks/account/PrivacyText";
 import { modeOf, modeShort, modeTone } from "@/lib/mode";
+import { ACCOUNT_API_READY, setPrimaryWorkspace } from "@/lib/api/client";
 import type { Me } from "@/lib/types/domain";
 
 // 마이페이지 (D-5, FE-013 §3.6, #090 디자인 정리). 백엔드에 있는 것만 보여준다: GET /me, PATCH /auth/password.
 // - 이름·직함·이메일 정정: PATCH /me 요청 중(FE-REQ-002 REQ-1) → 지금은 읽기 전용
-// - "기본" = me.workspace_id(로그인하면 처음 열리는 부서, 서버가 admin 소속 우선으로 계산). 메인 부서 지정은 백엔드에 개념이 없어 요청(REQ-7)
+// - "기본" = me.workspace_id(로그인하면 처음 열리는 부서). 본인이 [기본으로] 지정(REQ-7, 백엔드 feat/admin-account — 병합 전에는 버튼 비활성), 지정이 없으면 서버가 admin 소속 우선으로 계산
 // - 주소·휴대전화는 받지 않는다 (D-7)
 const roleLabel: Record<string, string> = { admin: "관리자", member: "멤버" };
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
@@ -50,6 +52,16 @@ export function MyPageView({ me, wsId, daysLeft, maxAgeDays }: { me: Me; wsId: n
   const [changed, setChanged] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const home = me.workspaces.find((w) => w.id === me.workspace_id);
+  const router = useRouter();
+  const [primaryBusy, setPrimaryBusy] = useState<number | null>(null);
+  const [primaryMsg, setPrimaryMsg] = useState<string | null>(null);
+  const makePrimary = async (id: number, name: string) => {
+    setPrimaryBusy(id); setPrimaryMsg(null);
+    const r = await setPrimaryWorkspace(id);
+    setPrimaryBusy(null);
+    setPrimaryMsg(r.ok ? `기본 부서를 ${name}(으)로 바꿨습니다 — 다음 로그인부터 이 부서가 먼저 열립니다` : r.message);
+    if (r.ok) router.refresh();
+  };
   const expired = daysLeft !== null && daysLeft <= 0;
   const soon = daysLeft !== null && daysLeft > 0 && daysLeft <= 14;
   const ratio = daysLeft !== null && maxAgeDays ? Math.max(0, Math.min(1, daysLeft / maxAgeDays)) : null;
@@ -103,9 +115,14 @@ export function MyPageView({ me, wsId, daysLeft, maxAgeDays }: { me: Me; wsId: n
                     <div className="mt-0.5 text-xs text-ink-muted">{roleLabel[w.role] ?? w.role}{w.can_configure && " · 부서 설정 가능"}</div>
                   </div>
                   <Chip tone={modeTone(modeOf(w))} className="h-5 shrink-0 text-xs">{modeShort[modeOf(w)]}</Chip>
+                  {me.workspaces.length > 1 && w.id !== me.workspace_id && (
+                    <Button size="xs" variant="outline" className="shrink-0" disabled={!ACCOUNT_API_READY || primaryBusy !== null} onClick={() => makePrimary(w.id, w.name)}
+                      title={ACCOUNT_API_READY ? "로그인하면 이 부서가 먼저 열리게 합니다" : "서버 준비 중입니다(REQ-7)"}>기본으로</Button>
+                  )}
                 </li>
               ))}
             </ul>
+            {primaryMsg && <p role="status" className="mt-2 text-xs text-ink-muted">{primaryMsg}</p>}
           </Section>
         </div>
 
