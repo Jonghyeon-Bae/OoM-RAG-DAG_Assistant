@@ -4,6 +4,8 @@ import { Dialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { cn } from "@/components/ui";
 import { fetchDocChunks } from "@/lib/api/client";
+import { PolicyTable } from "@/components/blocks/PolicyTable";
+import { isFirstPiece, policyBlocks } from "@/lib/policyText";
 import type { PolicyChunk, PolicyRef } from "@/lib/types/domain";
 
 // 규정 원문 창 (폰·PC 공통): 뒤 화면을 반투명으로 가리고, 문서 전체를 조문 순서대로 펼친다.
@@ -56,8 +58,11 @@ function DocBody({ wsId, source }: { wsId: number; source: PolicyRef }) {
             <section key={c.id} ref={i === first ? markRef : undefined} className={cn("rounded-lg px-3 py-2", hit && "bg-yellow-300/35 shadow-[inset_3px_0_0_var(--color-warn)]")}>
               {i === first && <span className="mb-1 inline-block rounded-full bg-primary-700 px-2 py-0.5 text-xs font-semibold text-white">규정 {source.ref.slice(1)} · 답변에 쓰인 조문</span>}
               {c.article_label !== chunks[i - 1]?.article_label && <h3 className="text-sm font-bold text-ink">{c.article_label}</h3>}
-              {c.text.split(/(?=[①②③④⑤⑥⑦⑧⑨])/).map((s) => s.trim()).filter(Boolean).map((line, j) => (
-                <p key={j} className="whitespace-pre-line text-sm leading-relaxed text-ink">{line}</p>
+              {/* 글은 ①②③ 항마다 한 문단, 표("| 칸 |" 줄)는 표로 */}
+              {policyBlocks(c.text, isFirstPiece(c.id)).map((b, j) => b.kind === "table" ? (
+                <div key={j} className="my-1.5"><PolicyTable head={b.head} rows={b.rows} /></div>
+              ) : (
+                <p key={j} className="whitespace-pre-line text-sm leading-relaxed text-ink">{b.text}</p>
               ))}
             </section>
           );

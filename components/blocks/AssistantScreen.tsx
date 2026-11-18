@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useReducer, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ArrowUp, ChevronDown, Loader2, Square, ExternalLink, RotateCcw, History, X, CircleCheck, TriangleAlert, CircleMinus, Check, Info, FileText, GitBranch, BookOpen, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUp, ChevronDown, Loader2, Square, ExternalLink, RotateCcw, History, X, CircleCheck, TriangleAlert, CircleMinus, Check, Info, FileText, GitBranch, BookOpen, Plus, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { PolicyDocDialog } from "@/components/blocks/PolicyDocDialog";
 import { fetchSessions, patchSessionScore, streamChat } from "@/lib/api/client";
 import { modeOf, type WsMode } from "@/lib/mode";
 import { shortArticle } from "@/lib/article";
+import { citesRef, splitMarks } from "@/lib/policyText";
 import type { Chain, ChainEvent, ChatEvent, CitationsEvent, DoneEvent, Intent, Mode, PolicyRef, SearchSession, StageNode, StageStatus, Workspace } from "@/lib/types/domain";
 
 // ── 한 질의(턴)의 상태: SSE 이벤트 9종이 차례로 채운다. 실서버에서는 턴 1개 = search_sessions 1행 ──
@@ -105,7 +106,7 @@ const stageLabel: { node: StageNode; label: string; hint: string }[] = [
 ];
 const intentLabel: Record<Intent, string> = { policy: "규정 확인", troubleshoot: "장애 해결", both: "규정 + 해결 사례" };
 // 실서버 stage detail 코드 → 표시 문구 (근거 없음은 gate 의 detail "no_evidence")
-const detailLabel: Record<string, string> = { no_evidence: "근거 없음" };
+const detailLabel: Record<string, string> = { no_evidence: "근거 없음", no_relevant_case: "관련 사례 없음" };
 // 추천 질문은 서버 workspace.suggestions(부서별). 고정 문구는 그 부서에 근거가 없는 질문을 띄운다 (FE-012 P0-2)
 // 모드별 안내·입력 힌트 (lib/mode 의 모드 3종)
 const modeIntro: Record<WsMode, string> = {
@@ -280,7 +281,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
     flowCount: sourceOf?.chain?.nodes.length ?? 0,
     policyCount: sourceOf?.policy.length ?? 0,
     flow: sourceOf?.chain ? <FlowView turn={sourceOf} wsId={ws.id} selectedId={activeNode ?? undefined} /> : null,
-    policy: sourceOf?.policy.length ? <SourceViewer bare sources={sourceOf.policy} activeRef={activeRef} onSelect={setActiveRef} current={!sourceOf.fromHistory && sourceOf.status === "done"} onOpenFile={openDoc} /> : null,
+    policy: sourceOf?.policy.length ? <SourceViewer bare sources={sourceOf.policy} activeRef={activeRef} onSelect={setActiveRef} current={!sourceOf.fromHistory && sourceOf.status === "done"} onOpenFile={openDoc} answer={sourceOf.status === "streaming" ? undefined : sourceOf.text} /> : null,
   };
   return (
     <main className="grid flex-1 items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_600px] xl:p-8">
@@ -316,7 +317,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
                       <span className="mt-1 block text-right text-xs text-white/60">{fmtTime(t.askedAt)}</span>
                     </div>
                     {isLast && <PipelineBadges turn={t} />}
-                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} collapsed={!isLast} highlighted={sourceIndex === i && state.turns.length > 1} activeRef={sourceIndex === i ? shownRef : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onEvidence={(what) => openEvidence(i, t, what)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} />
+                    <AnswerCard key={`${t.askedAt}-${isLast ? "open" : "folded"}`} turn={t} collapsed={!isLast} highlighted={sourceIndex === i && state.turns.length > 1} activeRef={sourceIndex === i ? shownRef : null} onOpen={() => { setSourceTurn(isLast ? null : i); setActiveRef(t.policy[0]?.ref ?? null); }} onCite={(ref) => cite(i, t, ref)} onEvidence={(what) => openEvidence(i, t, what)} onVote={(v) => vote(i, v)} onRetry={isLast && !streaming ? () => ask(t.query) : undefined} registerHref={ws.case_enabled ? `/w/${ws.id}/logs/new?title=${encodeURIComponent(t.query)}` : undefined} />
                   </div>
                 );
               })}
@@ -456,7 +457,7 @@ function FlowView({ turn, wsId, selectedId }: { turn: Turn; wsId: number; select
     </>
   );
 }
-function AnswerCard({ turn, collapsed, highlighted, activeRef, onOpen, onCite, onEvidence, onVote, onRetry }: { turn: Turn; collapsed: boolean; highlighted: boolean; activeRef: string | null; onOpen: () => void; onCite: (ref: string) => void; onEvidence: (what: EvidenceTab | "doc") => void; onVote: (v: 1 | -1 | null) => void; onRetry?: () => void }) {
+function AnswerCard({ turn, collapsed, highlighted, activeRef, onOpen, onCite, onEvidence, onVote, onRetry, registerHref }: { turn: Turn; collapsed: boolean; highlighted: boolean; activeRef: string | null; onOpen: () => void; onCite: (ref: string) => void; onEvidence: (what: EvidenceTab | "doc") => void; onVote: (v: 1 | -1 | null) => void; onRetry?: () => void; registerHref?: string }) {
   const [open, setOpen] = useState(!collapsed);
   const [why, setWhy] = useState(false); // 근거 확인 표시의 이유 펼침
   const trust = trustOf(turn);
@@ -480,9 +481,9 @@ function AnswerCard({ turn, collapsed, highlighted, activeRef, onOpen, onCite, o
       if (!line.trim()) return null;
       return (
         <p key={i} className="text-sm leading-relaxed text-ink">
-          {line.split(/(\[[PN]\d+\])/g).map((seg, j, segs) => {
+          {splitMarks(line).map((seg, j, segs) => {
             const m = /^\[([PN]\d+)\]$/.exec(seg);
-            if (!m) return <span key={j} className={cn(segs[j + 1] === `[${activeRef}]` && "rounded bg-primary-200 box-decoration-clone px-1 py-0.5")}>{seg}</span>; // 바로 뒤 번호가 고른 근거면 이 문장에 배경
+            if (!m) return <span key={j} className={cn(citesRef(segs, j, activeRef) && "rounded bg-primary-200 box-decoration-clone px-1 py-0.5")}>{seg}</span>; // 바로 뒤 번호가 고른 근거면 이 문장에 배경
             const unverified = tone(m[1]) === "warn";
             const picked = m[1] === activeRef && !unverified; // 출처 미확인(주황)은 골라도 경고 색 유지
             return (
@@ -559,7 +560,13 @@ function AnswerCard({ turn, collapsed, highlighted, activeRef, onOpen, onCite, o
           번호는 답의 근거입니다 — {hasP && <><b>규정 n</b> = 규정 문서의 조항</>}{hasP && hasN && " · "}{hasN && <><b>기록 n</b> = 해결 흐름의 n번째 기록</>}. 번호를 누르면 그 근거가 열립니다.
         </p>
       )}
-
+      {/* 근거 없음에서 바로 등록: 규정도 사례도 못 찾은 질문을 장애 건의 첫 기록으로 남기게 한다. 규정만 물은 질문에는 띄우지 않는다 */}
+      {turn.status === "done" && trust.level === "none" && !turn.chain && turn.intent !== "policy" && registerHref && (
+        <div className="mt-4 flex flex-col gap-2.5 rounded-xl border border-dashed border-primary-400 bg-primary-50 p-3.5">
+          <p className="text-sm leading-relaxed text-ink"><b>아직 기록이 없는 문제입니다.</b> 지금 남겨 두면 다음에 같은 질문을 하는 사람이 답을 찾습니다.</p>
+          <Link href={registerHref} className="inline-flex h-11 items-center gap-2 self-start rounded-lg bg-primary-700 px-4 text-sm font-bold text-white hover:bg-primary-800 active:bg-primary-800"><Plus className="size-4" aria-hidden /> 이 질문으로 장애 건 시작</Link>
+        </div>
+      )}
       {turn.status === "error" && (
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg bg-fail-bg/50 px-3 py-2 text-sm">
           <span className="text-fail">{turn.error ?? "연결이 끊겼습니다"}</span>
