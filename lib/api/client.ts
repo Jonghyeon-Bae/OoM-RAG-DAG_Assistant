@@ -1,6 +1,7 @@
 // 클라이언트 컴포넌트용. 브라우저 → /api/v1 (next.config rewrites → Spring :8080).
 // 일반 요청은 axios, 채팅 SSE 만 fetch (axios 는 브라우저에서 스트림을 조각으로 못 받는다).
 import axios from "axios";
+import type { Report, ReportAudience } from "@/lib/types/report";
 import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, PolicyUpload, Member, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
@@ -64,12 +65,34 @@ const codeText: Record<string, string> = {
   NOT_IN_REVIEW: "검수 중인 건만 할 수 있습니다. 화면을 새로 고쳐 주세요",
   NO_ARTICLES: "변환본에서 조문(제N조·별표·Q)을 하나도 찾지 못해 승인할 수 없습니다. 변환본을 고쳐 주세요",
   NOT_FAILED: "변환에 실패한 건만 다시 변환할 수 있습니다",
+  // 장애 보고서 (백엔드 PR #51)
+  REPORT_NOT_ROOT: "장애 건의 시작 기록에서만 보고서를 만들 수 있습니다",
 };
 export type ApiFail = { ok: false; code?: string; message: string };
 const fail = (e: unknown, what: string): ApiFail => {
   const b = errBody(e);
   return { ok: false, code: b?.code, message: (b?.code && codeText[b.code]) ?? b?.message ?? `${what} 실패 (${httpStatus(e) ?? "네트워크"})` };
 };
+
+// ── 장애 보고서 (FE-REQ-005·007, 백엔드 회신 11/18) ─────────────────────────────
+// 목록 = 대상(internal·external)마다 한 건. 순서는 고정이 아니라 audience 로 고른다(§3.7 ①)
+export async function fetchReports(wsId: number, rootId: number): Promise<{ ok: true; items: Report[] } | ApiFail> {
+  try {
+    const { data } = await api.get<Report[]>(`/reports?root_id=${rootId}`, ws(wsId));
+    return { ok: true, items: data };
+  } catch (e) {
+    return fail(e, "보고서 조회");
+  }
+}
+// 만들기. 같은 내용 완료본·만드는 중인 건은 서버가 새로 만들지 않고 그것을 돌려준다
+export async function createReport(wsId: number, body: { root_id: number; audience: ReportAudience; force?: boolean }): Promise<{ ok: true; report: Report } | ApiFail> {
+  try {
+    const { data } = await api.post<Report>("/reports", body, ws(wsId));
+    return { ok: true, report: data };
+  } catch (e) {
+    return fail(e, "보고서 만들기");
+  }
+}
 
 // ── 로그·체인 ────────────────────────────────────────────────────────────────
 // summarize:false = 요약을 그리지 않는 화면(등록 미리보기). 서버가 AI 요약 생성을 시작하지 않는다(백엔드 #48, 비용)

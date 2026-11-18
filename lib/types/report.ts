@@ -1,5 +1,5 @@
 // 장애 보고서 템플릿 R1 계약 (FE-REQ-005 §4, 2026-11-13 확정). 서버 응답 content 와 같은 모양.
-// 지금은 백엔드 API(R-1~R-3) 전이라 lib/report/assemble.ts 가 사실 칸만 채운다 — AI 문장 칸은 빈 값.
+// 출처: 백엔드 /reports (2026-11-18 회신, PR #51). 사실 칸은 서버가 DB 로, AI 문장 칸은 워커가 채운다.
 
 export type ReportAudience = "internal" | "external";
 export type ReportKind = "occurrence" | "cause" | "resolution" | "action" | "side_issue" | "reference";
@@ -23,7 +23,7 @@ export interface ReportContent {
   };
   side_issues: { ref: string; title: string; note: ReportSentence | null }[];
   policy: { ref: string; relation: "follows" | "exception" | "gap"; document: string | null; article: string | null; note: string | null }[];
-  // ↓ LLM 칸 — 백엔드 생성 전에는 빈 배열
+  // ↓ AI 칸 — generating·failed 이거나 서버 AI 꺼짐이면 빈 배열. open_items 는 서버 사실 칸
   summary: ReportSentence[];
   impact: ReportSentence[];
   prevention: (ReportSentence & { owner?: string | null; due?: string | null })[];
@@ -31,9 +31,13 @@ export interface ReportContent {
   records: { ref: string; id: number; kind: ReportKind; title: string; at: string; author: string | null }[];
 }
 
-// 서버 보고서(R-2) — 백엔드가 생기면 이 모양으로 받는다
+// 서버 보고서 (GET /reports?root_id= · POST /reports). id 는 다시 만들면 바뀐다 — 주소·저장소에 넣지 않는다(회신 §3.7 ③)
 export interface Report {
   id: number; root_id: number; status: "generating" | "done" | "failed"; audience: ReportAudience;
-  template_version: "R1"; prompt_version: string | null; model: string | null; generated_at: string | null;
-  error: string | null; stale: boolean; content: ReportContent | null;
+  // 지금 보여 주는 보고서보다 새 요청의 상태 — 목록에서만 값, POST·한 건 조회는 늘 null (§3.5)
+  pending_status: "generating" | "failed" | null;
+  template_version: "R1"; prompt_version: string | null; model: string | null;
+  generated_at: string | null; // UTC. 만드는 중이면 null
+  error: string | null;        // 서버 내부 오류 원문 — 화면에 보이지 않는다(§6)
+  stale: boolean; content: ReportContent;
 }
