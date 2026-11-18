@@ -3,15 +3,17 @@ import { useState } from "react";
 import { cn } from "@/components/ui";
 import { MembersPanel } from "@/components/blocks/admin/MembersPanel";
 import { DeptSettingsPanel } from "@/components/blocks/admin/DeptSettingsPanel";
+import { AuditPanel } from "@/components/blocks/admin/AuditPanel";
 import type { ManageableWorkspace, Member } from "@/lib/types/domain";
 
 // 관리자 (D-5, FE-013 §3.6). 탭은 권한이 있는 것만 보인다: 멤버 = 이 ws 의 admin, 부서 설정 = can_configure(회사 관리자 포함)
-// 규정 문서·접속 기록은 백엔드 API 가 생기면 탭으로 더한다 — 빈 탭을 미리 두지 않는다 (지침 8)
-type Tab = "members" | "settings";
+// 접속 기록 = 회사 관리자(GET /audit, #121). 규정 문서 관리는 문서 메뉴(/documents)에서 한다
+type Tab = "members" | "settings" | "audit";
 export function AdminView({ wsId, wsName, members, manageable, meId, companyAdmin }: { wsId: number; wsName: string; members: Member[] | null; manageable: ManageableWorkspace[]; meId: number; companyAdmin: boolean }) {
   const tabs: { id: Tab; label: string }[] = [
     ...(members ? [{ id: "members" as const, label: "멤버" }] : []),
     ...(manageable.length ? [{ id: "settings" as const, label: "부서 설정" }] : []),
+    ...(companyAdmin ? [{ id: "audit" as const, label: "접속 기록" }] : []),
   ];
   const [tab, setTab] = useState<Tab>(tabs[0]?.id ?? "members");
   return (
@@ -24,7 +26,7 @@ export function AdminView({ wsId, wsName, members, manageable, meId, companyAdmi
       </div>
       {tab === "members" && members && <MembersPanel wsId={wsId} wsName={wsName} initial={members} meId={meId} companyAdmin={companyAdmin} />}
       {tab === "settings" && manageable.length > 0 && <DeptSettingsPanel initial={manageable} />}
-      <p className="text-xs text-ink-muted">규정 문서 관리·접속 기록은 백엔드 API가 생기면 이 화면에 추가됩니다.</p>
+      {tab === "audit" && companyAdmin && <AuditPanel />}
     </main>
   );
 }
