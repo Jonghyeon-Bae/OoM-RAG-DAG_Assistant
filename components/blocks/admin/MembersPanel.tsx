@@ -1,12 +1,12 @@
 "use client";
-import { Fragment, useState } from "react";
-import { Copy, Loader2, Lock, UserPlus, Settings2 } from "lucide-react";
+import { Fragment, useEffect, useState } from "react";
+import { Copy, Loader2, Lock, UserPlus, UserX, Settings2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Chip, Field } from "@/components/ui";
-import { ACCOUNT_API_READY, changeMemberRole, deactivateUser, fetchMembers, inviteUser, removeMember, resetUserPassword, unlockUser } from "@/lib/api/client";
-import type { InviteResult, Member, MemberRole } from "@/lib/types/domain";
+import { ACCOUNT_API_READY, changeMemberRole, deactivateUser, fetchInactiveUsers, fetchMembers, inviteUser, reactivateUser, removeMember, resetUserPassword, unlockUser } from "@/lib/api/client";
+import type { InactiveUser, InviteResult, Member, MemberRole } from "@/lib/types/domain";
 
 // 멤버: 목록(이메일 마스킹) · 초대(임시 비밀번호 1회 표시) · 잠금 해제 — 현재 워크스페이스 admin 전용 (D-5)
 // 멤버 관리(#104): 역할 변경·부서에서 제외 = 부서 관리자(서버 구현됨), 임시 비밀번호 재발급 = 부서 관리자(REQ-11), 계정 비활성화 = 회사 관리자 — 둘은 FE-REQ-004로 서버 대기
@@ -50,13 +50,25 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
   const [confirm, setConfirm] = useState<{ id: number; kind: "remove" | "deactivate"; reason: string } | null>(null);
   const [acting, setActing] = useState(false);
   const [reset, setReset] = useState<{ name: string; temp: string } | null>(null);
+  // 비활성 계정(회사 관리자) — 비활성화하면 멤버 목록에서 빠지므로 다시 활성화할 곳이 여기뿐이다
+  const [inactive, setInactive] = useState<InactiveUser[] | null>(null);
+  const [inactiveErr, setInactiveErr] = useState<string | null>(null);
+  const showInactive = companyAdmin && ACCOUNT_API_READY;
+  const loadInactive = async () => { const r = await fetchInactiveUsers(wsId); if (r.ok) { setInactive(r.items); setInactiveErr(null); } else setInactiveErr(r.message); };
+  useEffect(() => {
+    if (!showInactive) return;
+    let alive = true;
+    fetchInactiveUsers(wsId).then((r) => { if (!alive) return; if (r.ok) setInactive(r.items); else setInactiveErr(r.message); });
+    return () => { alive = false; };
+  }, [showInactive, wsId]);
   const act = async (label: string, run: () => Promise<{ ok: true } | { ok: false; message: string }>, close = true) => {
     setActing(true); setNotice(null);
     const r = await run();
     setActing(false);
     setNotice(r.ok ? label : r.message);
-    if (r.ok) { setConfirm(null); if (close) setOpenId(null); await reload(); }
+    if (r.ok) { setConfirm(null); if (close) setOpenId(null); await reload(); if (showInactive) await loadInactive(); }
   };
+  const reactivate = (u: InactiveUser) => act(`${u.name} 계정을 다시 활성화했습니다 — 소속 부서는 그대로입니다`, () => reactivateUser(wsId, u.id));
   const setRole = (m: Member, role: MemberRole) => act(`${m.name}: ${roleLabel[role]}(으)로 바꿨습니다`, async () => { const r = await changeMemberRole(wsId, m.id, role); return r.ok ? { ok: true } : r; }, false);
   const remove = (m: Member) => act(`${m.name}을(를) ${wsName}에서 제외했습니다 — 계정과 작성한 기록은 남습니다`, () => removeMember(wsId, m.id));
   const deactivate = (m: Member, reason: string) => act(`${m.name} 계정을 비활성화했습니다 — 로그인할 수 없고, 작성한 기록은 남습니다`, () => deactivateUser(wsId, m.id, reason));
@@ -171,9 +183,9 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-ink-muted">역할 변경·멤버 제외는 준비 중입니다(백엔드 API 요청 — FE-013 §3.2).</p>
       </Card>
 
+      <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
       <Card className="gap-4 p-6">
         <h2 className="flex items-center gap-2 font-bold text-ink"><UserPlus className="size-4" /> 멤버 초대</h2>
         <p className="text-xs text-ink-muted">새 사번이면 계정을 만들고 임시 비밀번호를 한 번 보여줍니다. 이미 있는 사번이면 이 워크스페이스 멤버로만 추가합니다. 받은 사람은 첫 로그인 때 개인정보 동의와 비밀번호 변경을 거칩니다.</p>
@@ -209,6 +221,31 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
           </div>
         )}
       </Card>
+
+      {companyAdmin && (
+        <Card className="gap-3 p-6">
+          <h2 className="flex items-center gap-2 font-bold text-ink"><UserX className="size-4" /> 비활성 계정{inactive && <span className="text-sm font-normal text-ink-muted">{inactive.length}명</span>}</h2>
+          <p className="text-xs text-ink-muted">회사 전체에서 비활성화한 계정입니다(회사 관리자만 보입니다). 다시 활성화하면 이전 소속 부서 그대로 로그인할 수 있습니다.</p>
+          {!ACCOUNT_API_READY ? <p className="rounded-md bg-primary-50 px-3 py-2 text-xs text-ink-muted">서버 준비 중입니다(FE-REQ-004) — 연결되면 목록이 여기에 나옵니다.</p>
+            : inactiveErr ? <p role="alert" className="rounded-md bg-fail-bg px-3 py-2 text-xs text-fail">{inactiveErr}</p>
+            : !inactive ? <p className="text-xs text-ink-muted">불러오는 중…</p>
+            : inactive.length === 0 ? <p className="text-xs text-ink-muted">비활성 계정이 없습니다.</p>
+            : (
+              <ul className="divide-y divide-border">
+                {inactive.map((u) => (
+                  <li key={u.id} className="flex items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-ink">{u.name} <span className="text-xs text-ink-muted">{u.title ?? ""}</span></div>
+                      <div className="truncate text-xs text-ink-muted"><span className="tabular-nums">{u.employee_no}</span> · {u.email_masked ?? "이메일 없음"}</div>
+                    </div>
+                    <Button size="xs" variant="outline" disabled={acting} onClick={() => reactivate(u)}>다시 활성화</Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+        </Card>
+      )}
+      </div>
     </div>
   );
 }

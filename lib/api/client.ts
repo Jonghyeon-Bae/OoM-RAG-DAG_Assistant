@@ -2,7 +2,7 @@
 // 일반 요청은 axios, 채팅 SSE 만 fetch (axios 는 브라우저에서 스트림을 조각으로 못 받는다).
 import axios from "axios";
 import type { Report, ReportAudience } from "@/lib/types/report";
-import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, PolicyUpload, Member, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
+import type { Chain, ChatEvent, SearchSession, LogNode, LogType, PolicyDocument, PolicyChunk, DocStatus, DocEvent, PolicyUpload, Member, InactiveUser, AuditItem, Me, MemberRole, InviteInput, InviteResult, Workspace, PolicyRefInput, PolicyArticleOption } from "@/lib/types/domain";
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/api/v1";
 
@@ -55,6 +55,7 @@ const codeText: Record<string, string> = {
   SELF_DEACTIVATION: "자기 자신의 계정은 비활성화할 수 없습니다",
   LAST_COMPANY_ADMIN: "회사 관리자가 한 명은 있어야 합니다",
   ALREADY_INACTIVE: "이미 비활성화된 계정입니다",
+  EMAIL_TAKEN: "다른 계정이 이미 쓰는 이메일입니다",
   // 규정 문서·업로드 (백엔드 #37·#44)
   SUPERSEDED: "새 판으로 대체된 문서라 복원할 수 없습니다 — 두 판이 함께 검색되기 때문입니다",
   NOT_RETIRED: "폐기한 문서만 삭제할 수 있습니다",
@@ -430,6 +431,47 @@ export async function reactivateUser(wsId: number, userId: number): Promise<{ ok
     return { ok: true };
   } catch (e) {
     return fail(e, "계정 재활성화");
+  }
+}
+
+// 비활성 계정 목록 — 회사 단위 API 라 부서 헤더와 무관하다(헤더는 다른 호출과 같게 보낸다)
+export async function fetchInactiveUsers(wsId: number): Promise<{ ok: true; items: InactiveUser[] } | ApiFail> {
+  try {
+    const { data } = await api.get<InactiveUser[]>("/users/inactive", ws(wsId));
+    return { ok: true, items: data };
+  } catch (e) {
+    return fail(e, "비활성 계정 조회");
+  }
+}
+
+// 내 정보 정정(처리방침 §4) — 이름·직급·직책·이메일. 빈 문자열은 지움(이름 제외). 사번·소속·역할은 바꿀 수 없다
+export async function updateProfile(body: { name?: string; grade?: string; position?: string; email?: string }): Promise<{ ok: true; me: Me } | ApiFail> {
+  try {
+    const { data } = await api.patch<Me>("/me", body);
+    return { ok: true, me: data };
+  } catch (e) {
+    return fail(e, "내 정보 수정");
+  }
+}
+
+// 접속 기록(회사 관리자). 부서 헤더 없이 부른다. from·to = YYYY-MM-DD(한국 시각 0시), to 는 그 시각 "전"까지
+export async function fetchAudit(q: { from?: string; to?: string; action?: string; employee_no?: string; limit?: number }): Promise<{ ok: true; items: AuditItem[] } | ApiFail> {
+  try {
+    const params = Object.fromEntries(Object.entries(q).filter(([, v]) => v !== undefined && v !== ""));
+    const { data } = await api.get<{ items: AuditItem[] }>("/audit", { params });
+    return { ok: true, items: data.items };
+  } catch (e) {
+    return fail(e, "접속 기록 조회");
+  }
+}
+
+// 메인 부서 지정(REQ-7) — 로그인 뒤 처음 열릴 부서. 소속 부서만 가능(아니면 400 VALIDATION). 같은 백엔드 PR(feat/admin-account)이라 ACCOUNT_API_READY 를 함께 쓴다
+export async function setPrimaryWorkspace(workspaceId: number): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.patch("/me", { primary_workspace_id: workspaceId });
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "기본 부서 지정");
   }
 }
 

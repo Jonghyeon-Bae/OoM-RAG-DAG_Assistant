@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Loader2, Printer, RefreshCw } from "lucide-react";
+import { ArrowLeft, Copy, Eye, Loader2, Printer, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Chip, cn } from "@/components/ui";
 import { createReport, fetchReports } from "@/lib/api/client";
@@ -25,6 +25,7 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
   const [busy, setBusy] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [preview, setPreview] = useState(false); // 인쇄 미리보기 — A4 폭 종이 모양으로 본 뒤 인쇄(#121)
   const tried = useRef(new Set<ReportAudience>()); // 자동 첫 생성은 대상마다 한 번만
 
   const apply = (r: Awaited<ReturnType<typeof fetchReports>>) => {
@@ -99,7 +100,7 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
           <Button size="sm" variant="outline" onClick={async () => { await navigator.clipboard?.writeText(reportMarkdown(cur.content, audience, aiStateOf(cur))); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
             <Copy className="size-3.5" /> {copied ? "복사됨" : "Markdown 복사"}
           </Button>
-          <Button size="sm" onClick={() => window.print()}><Printer className="size-3.5" /> 인쇄·PDF</Button>
+          <Button size="sm" onClick={() => { setPreview(true); window.scrollTo({ top: 0 }); }}><Eye className="size-3.5" /> 인쇄 미리보기</Button>
         </div>
       )}
     </div>
@@ -138,11 +139,23 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
   const to = (ref: string) => { const id = idOf.get(ref); return id ? `/w/${wsId}/timeline?entry=${id}` : null; };
   const aiTag = (ai === "done" || cur.pending_status) && c.summary.length > 0 && <AiTag />;
 
+  // 미리보기 줄 — 종이에 나오지 않는 것(도구·상태 안내)을 걷어 내고 A4 폭으로 보여 준다. 쪽 경계선은 대략(표·섹션이 쪽을 넘지 않게 밀리면 달라진다)
+  const previewBar = (
+    <div className="sticky top-0 z-10 flex w-full flex-wrap items-center gap-2 rounded-lg bg-card px-3 py-2 shadow-sm ring-1 ring-foreground/10 print:hidden">
+      <span className="text-sm font-semibold text-ink">인쇄 미리보기</span>
+      <span className="text-xs text-ink-muted">A4 세로 · 여백 14mm · 점선 = 쪽 경계(대략){!internal && " · 외부 공개용"}</span>
+      <div className="ml-auto flex gap-2">
+        <Button size="sm" onClick={() => window.print()}><Printer className="size-3.5" /> 인쇄·PDF 저장</Button>
+        <Button size="sm" variant="outline" onClick={() => setPreview(false)}><X className="size-3.5" /> 닫기</Button>
+      </div>
+    </div>
+  );
+
   return (
-    <main className="flex flex-col gap-4 p-3 md:p-6 xl:p-8 print:p-0">
-      {toolbar}
+    <main className={cn("flex flex-col gap-4 p-3 md:p-6 xl:p-8 print:block print:p-0", preview && "items-center bg-primary-100/60 print:bg-transparent")}>
+      {preview ? previewBar : toolbar}
       {/* 상태 안내 — 인쇄에는 나오지 않는다. error 원문은 보이지 않는다(§6) */}
-      <div className="flex flex-col gap-2 print:hidden" aria-live="polite">
+      <div className={cn("flex flex-col gap-2 print:hidden", preview && "hidden")} aria-live="polite">
         {cur.status === "generating" && (timedOut
           ? <Notice tone="warn">아직 AI 문장을 만드는 중입니다. 잠시 뒤 새로 고쳐 보세요. <Button size="sm" variant="outline" onClick={refresh}><RefreshCw className="size-3.5" /> 새로고침</Button></Notice>
           : <Notice><Loader2 className="size-4 animate-spin" /> AI 문장 칸을 작성하는 중입니다 — 사실 칸은 지금 기록 그대로입니다</Notice>)}
@@ -158,7 +171,8 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
         {!internal && <Notice tone="warn">외부로 보내기 전에 한 번 읽어 주세요 — 작성자·보고자 이름은 지웠지만, 기록 본문에 적힌 사람 이름은 남아 있을 수 있습니다.</Notice>}
       </div>
 
-      <article className="mx-auto w-full max-w-4xl rounded-2xl bg-card p-4 text-sm leading-relaxed text-ink shadow-sm ring-1 ring-foreground/10 sm:p-8 print:max-w-none print:rounded-none print:p-0 print:shadow-none print:ring-0">
+      <article className={cn("text-sm leading-relaxed text-ink print:w-auto print:max-w-none print:rounded-none print:p-0 print:shadow-none print:ring-0",
+        preview ? "report-sheet w-[210mm] max-w-full bg-white p-4 shadow-md sm:p-[14mm]" : "mx-auto w-full max-w-4xl rounded-2xl bg-card p-4 shadow-sm ring-1 ring-foreground/10 sm:p-8")}>
         {!internal && <div className="mb-3 rounded bg-primary-700 px-3 py-1 text-center text-xs font-semibold text-white">외부 공개용</div>}
         {c.meta.interim && <div className="mb-3 rounded bg-warn-bg px-3 py-1 text-center text-xs font-semibold text-ink ring-1 ring-warn/40">중간 보고 — 아직 진행 중인 장애 건입니다</div>}
         <h1 className="text-xl font-bold leading-snug sm:text-2xl">{c.meta.interim ? "[장애 중간 보고서]" : "[장애 보고서]"} {c.meta.title}</h1>

@@ -263,7 +263,9 @@ export interface Me {
   id: number;
   employee_no: string;
   name: string;
-  title: string | null;
+  title: string | null;      // 표시용 "직급 · 직책"
+  grade?: string | null;    // 직급 (PATCH /me 로 본인이 정정)
+  position?: string | null; // 직책
   email: string | null;
   workspace_id: number | null;
   workspaces: { id: number; name: string; policy_enabled: boolean; case_enabled: boolean; role: string; can_configure: boolean }[]; // kind='dept' 만
@@ -276,6 +278,10 @@ export interface Me {
 // ── 관리자 (UserAdminController · WorkspaceController) ──
 export type MemberRole = "admin" | "member";
 export interface Member { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null; role: MemberRole; locked: boolean }
+// GET /audit — 접속 기록(회사 관리자, 자기 회사만). category: auth 로그인·비밀번호 / member 멤버 관리 / settings 부서 설정. IP 는 서버가 가려서 준다
+export interface AuditItem { id: number; at: string; category: "auth" | "member" | "settings"; action: string; employee_no: string | null; actor: string | null; ip_masked: string | null; reason: string | null }
+// GET /users/inactive — 같은 회사의 비활성 계정(회사 관리자). 멤버 목록에서는 빠지므로 재활성화는 이 목록에서 한다
+export interface InactiveUser { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null }
 export interface InviteInput { employee_no: string; name: string; email?: string; title?: string; role: MemberRole }
 // temp_password: 새 계정일 때만 1회 내려온다(created=false 면 null — 기존 계정을 멤버로만 추가). 화면 밖으로 남기지 않는다
 export interface InviteResult { id: number; employee_no: string; name: string; workspace_id: number; role: MemberRole; created: boolean; temp_password: string | null }

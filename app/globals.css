@@ -126,3 +126,10 @@
   @page { size: A4; margin: 14mm; }
   html, body { background: #fff !important; }
 }
+/* 보고서 인쇄 미리보기(#121): 종이 한 쪽의 본문 높이(297 − 여백 14×2 = 269mm)마다 점선 — 화면 전용, 대략의 쪽 경계 */
+@media screen {
+  .report-sheet {
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(269mm - 1px), #b9bfd6 calc(269mm - 1px), #b9bfd6 269mm);
+    background-origin: content-box;
+  }
+}
