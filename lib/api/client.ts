@@ -20,9 +20,17 @@ api.interceptors.response.use(
     if (axios.isAxiosError(err) && err.response?.status === 401 && err.config?.url !== "/auth/login" && typeof window !== "undefined") {
       window.location.assign("/login");
     }
+    // 화면을 열어 둔 사이 처리방침 판이 바뀌었거나 비밀번호가 만료된 경우 — 서버가 업무 API 를 403 으로 막는다(백엔드 #54). 게이트로 보낸다
+    if (axios.isAxiosError(err) && err.response?.status === 403 && typeof window !== "undefined") {
+      const to = gatePath((err.response.data as { code?: string } | undefined)?.code);
+      if (to && !window.location.pathname.startsWith("/gate")) window.location.assign(to);
+    }
     return Promise.reject(err);
   },
 );
+
+// 403 의 code → 게이트 화면. 그 밖의 403(권한 없음·소속 아닌 부서)은 로그인이 끊긴 것이 아니므로 화면에 문구만 보인다
+export const gatePath = (code?: string) => (code === "CONSENT_REQUIRED" ? "/gate/consent" : code === "PASSWORD_CHANGE_REQUIRED" ? "/gate/password" : null);
 
 // Spring 이 이 헤더로 워크스페이스 소속을 확인한다 (TenantContextFilter)
 const ws = (wsId: number) => ({ headers: { "X-Workspace-Id": String(wsId) } });
@@ -41,7 +49,7 @@ const codeText: Record<string, string> = {
   REF_ROOT: "참고 자료는 완료 처리 대상이 아닙니다",
   PROBLEM_TITLE_REQUIRED: "어떤 문제를 해결했는지 제목을 적어 주세요",
   RESOLVED_NODE_INVALID: "고른 기록 중 이 장애 건의 해결 기록이 될 수 없는 것이 있습니다. 화면을 새로 고쳐 주세요",
-  CATEGORY_INVALID: "원인 표시는 상위가 있는 실패 기록에만 할 수 있습니다",
+  CATEGORY_INVALID: "이 기록에는 붙일 수 없는 표시입니다(원인 = 상위가 있는 실패 기록, 재발 방지 = 상위가 있는 성공 기록)",
   POLICY_REF_NOT_FOUND: "그 조문을 찾을 수 없습니다. 폐기된 구판 조문일 수 있습니다",
   // 관리자 (D-5)
   FORBIDDEN: "권한이 없습니다",
@@ -176,6 +184,16 @@ export async function patchStatus(wsId: number, id: number, status: "active" | "
 }
 
 // 응답 형태 차이 ②: 목업 OPTIONS → 실서버 GET /logs/{id}/orphaned
+// 기록 표시(백엔드 #33·#58): "prevention" = 재발 방지·후속 조치(상위가 있는 성공 기록만), "" = 해제. 아니면 400 CATEGORY_INVALID
+export async function patchCategory(wsId: number, id: number, category: "prevention" | "cause" | ""): Promise<{ ok: true; node: LogNode } | ApiFail> {
+  try {
+    const { data } = await api.patch<LogNode>(`/logs/${id}`, { category }, ws(wsId));
+    return { ok: true, node: data };
+  } catch (e) {
+    return fail(e, "표시 변경");
+  }
+}
+
 export async function fetchOrphaned(wsId: number, id: number): Promise<number[]> {
   try {
     const { data } = await api.get<{ orphaned: number[] }>(`/logs/${id}/orphaned`, ws(wsId));
@@ -208,6 +226,10 @@ export async function streamChat(wsId: number, query: string, onEvent: (e: ChatE
   if (r.status === 401) {
     window.location.assign("/login");
     return;
+  }
+  if (r.status === 403) {
+    const to = gatePath(((await r.json().catch(() => null)) as { code?: string } | null)?.code);
+    if (to) { window.location.assign(to); return; }
   }
   if (!r.ok || !r.body) throw new Error(`chat ${r.status}`);
 
@@ -413,9 +435,8 @@ export async function removeMember(wsId: number, userId: number): Promise<{ ok: 
   }
 }
 
-// 계정 비활성화(퇴사·장기 미사용)·재활성화·임시 비밀번호 재발급 — 회사 관리자. 백엔드 미구현: FE-REQ-004 제안 경로
-// 서버에 생기면 ACCOUNT_API_READY 만 true 로 바꾼다(화면은 이미 연결돼 있다)
-export const ACCOUNT_API_READY = false;
+// 계정 비활성화(퇴사·장기 미사용)·재활성화 = 회사 관리자, 임시 비밀번호 재발급 = 부서 관리자(대상이 속한 모든 부서의 admin 일 때) 또는 회사 관리자
+export const ACCOUNT_API_READY = true; // 백엔드 PR #53~#55 병합(11/19) — #126
 export async function deactivateUser(wsId: number, userId: number, reason: string): Promise<{ ok: true } | ApiFail> {
   try {
     await api.post(`/users/${userId}/deactivate`, { reason }, ws(wsId));
