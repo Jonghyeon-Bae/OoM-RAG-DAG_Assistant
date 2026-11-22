@@ -115,6 +115,13 @@
   html {
     @apply font-sans;
   }
+  /* 큰 화면(#124): FHD(1920) 까지는 기본 글자 크기 그대로, 그보다 넓으면 폭에 따라 키운다 — QHD(2560) ≈ 117%, 4K(3840) = 150% 에서 멈춤.
+     크기·간격이 모두 rem 이라 화면 전체가 같은 비율로 커진다. 100% 기준이라 브라우저의 글자 크기 설정도 그대로 따른다. 인쇄는 제외 */
+  @media screen and (min-width: 1921px) {
+    html {
+      font-size: clamp(100%, calc(100% + (100vw - 1920px) * 0.00417), 150%);
+    }
+  }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   a[href] {

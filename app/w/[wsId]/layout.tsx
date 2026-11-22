@@ -21,7 +21,8 @@ export default async function WorkspaceLayout({
   return (
     <div className="flex min-h-screen flex-1 flex-col lg:flex-row">
       <Sidebar wsId={ws.id} policyEnabled={ws.policy_enabled} caseEnabled={ws.case_enabled} adminMenu={accessOf(me, ws.id).adminMenu} />
-      <div className="flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 print:pb-0">{children}</div>
+      {/* 본문 폭 상한 110rem(#124) — 아주 넓은 화면에서 줄이 끝없이 길어지지 않게 가운데로 모은다. 머리줄(Header)은 같은 선에 맞춰 안쪽 여백을 늘린다 */}
+      <div className="flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 print:pb-0 [&>main]:mx-auto [&>main]:w-full [&>main]:max-w-[110rem] print:[&>main]:max-w-none">{children}</div>
     </div>
   );
 }

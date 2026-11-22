@@ -161,7 +161,7 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
           ))}
         </ul>
         <div className="hidden overflow-x-auto sm:block">
-          <table className="w-full min-w-[560px] text-sm">
+          <table className="w-full min-w-[35rem] text-sm">
             <thead><tr className="border-b border-border text-left text-xs text-ink-muted"><th className="py-2 font-medium">이름</th><th className="font-medium">사번</th><th className="font-medium">직함</th><th className="font-medium">이메일</th><th className="font-medium">역할</th><th className="text-right font-medium">상태</th><th className="w-16" /></tr></thead>
             <tbody>
               {members.map((m) => (

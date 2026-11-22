@@ -48,7 +48,7 @@ export function UploadsPanel({ wsId, initial, docs, canUpload, companyAdmin, onA
   const changed = (u: PolicyUpload) => setItems((p) => p.map((x) => (x.id === u.id ? { ...x, ...u, markdown: null } : x)));
 
   return (
-    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)]">
+    <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(18.75rem,23.75rem)_minmax(0,1fr)]">
       <div className="flex min-w-0 flex-col gap-4">
         {canUpload ? <UploadForm wsId={wsId} docs={docs} companyAdmin={companyAdmin} onAdded={added} /> : (
           <Card className="p-4 text-sm text-ink-muted">규정 파일은 부서 관리자가 올립니다. 여기서는 진행 상황과 변환 결과를 볼 수 있습니다.</Card>

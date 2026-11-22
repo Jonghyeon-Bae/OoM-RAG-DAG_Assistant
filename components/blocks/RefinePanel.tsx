@@ -37,7 +37,7 @@ function Stepper({ status }: { status: RefineStatus }) {
 
 function Result({ n }: { n: LogNode }) {
   return (
-    <dl className="grid grid-cols-[72px_1fr] items-center gap-x-4 gap-y-2.5 text-sm">
+    <dl className="grid grid-cols-[4.5rem_1fr] items-center gap-x-4 gap-y-2.5 text-sm">
       <dt className="text-ink-muted">에러 코드</dt>
       <dd>{n.error_code ? <Chip tone="fail" className="font-semibold">{n.error_code}</Chip> : <span className="text-ink-muted">—</span>}</dd>
       <dt className="text-ink-muted">키워드</dt>
@@ -153,7 +153,7 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
         <ol className="relative ml-2 border-l border-border pl-5">
           {recent.map((n) => (
             <li key={n.id} className="relative mb-4 last:mb-0">
-              <span className={cn("absolute -left-[26px] top-2 size-2.5 rounded-full ring-4 ring-card", n.type === "fail" ? "bg-fail" : n.type === "success" ? "bg-success" : "bg-ref")} />
+              <span className={cn("absolute -left-[1.625rem] top-2 size-2.5 rounded-full ring-4 ring-card", n.type === "fail" ? "bg-fail" : n.type === "success" ? "bg-success" : "bg-ref")} />
               <div className={cn("flex flex-col gap-1.5", n.status === "deprecated" && "opacity-60")}>
                 <div className="flex items-center gap-2">
                   <TypeBadge type={n.type} />

@@ -53,7 +53,7 @@ function CompareBars({ rows }: { rows: NonNullable<DashboardSummary["search_time
   return (
     <div className="flex flex-col gap-5">
       {rows.map((r) => (
-        <div key={r.intent} className="grid grid-cols-[72px_1fr] items-center gap-4">
+        <div key={r.intent} className="grid grid-cols-[4.5rem_1fr] items-center gap-4">
           <div className="text-sm text-ink">{intentLabel[r.intent]}</div>
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center gap-2">

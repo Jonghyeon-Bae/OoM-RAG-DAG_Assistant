@@ -43,7 +43,7 @@ export function ChainNodeCard({ node, compact = false, selected = false, reasons
     <div
       className={cn(
         "rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3",
-        fluid ? "w-full" : compact ? "min-w-[200px] max-w-[280px]" : "min-w-[220px] max-w-[280px]",
+        fluid ? "w-full" : compact ? "min-w-[12.5rem] max-w-[17.5rem]" : "min-w-[13.75rem] max-w-[17.5rem]",
         tone[node.type],
         deprecated && "opacity-50 grayscale-[0.4]",
         selected ? "border-primary-700 ring-2 ring-primary-400" : "border-transparent",
