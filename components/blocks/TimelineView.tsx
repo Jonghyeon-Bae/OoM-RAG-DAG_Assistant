@@ -1,14 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText } from "lucide-react";
+import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText, ShieldCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Chip, TypeBadge, cn } from "@/components/ui";
 import { ChainGraph } from "@/components/blocks/ChainGraph";
 import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
-import { fetchChain, fetchLog, fetchOrphaned, patchResolved, patchStatus, postRefine } from "@/lib/api/client";
+import { fetchChain, fetchLog, fetchOrphaned, patchCategory, patchResolved, patchStatus, postRefine } from "@/lib/api/client";
 import type { Chain, LogNode, LogType } from "@/lib/types/domain";
 
 const typeFilters: { key: LogType | "all"; label: string; cls: string }[] = [
@@ -124,6 +124,14 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
   const [ask, setAsk] = useState<{ id: number; orphaned: number[]; reason: string } | null>(null);
   const [note, setNote] = useState<{ id: number; text: string } | null>(null); // 성공 로그 없이 완료할 때 사유 입력
   const [flash, setFlash] = useState<string | null>(null);
+  // 재발 방지·후속 조치 표시(백엔드 #58) — 상위가 있는 성공 기록만. 표시한 기록이 보고서의 그 칸에 실리고, 저장된 보고서는 "기록이 바뀌었습니다"가 된다
+  const setPrevention = async (l: LogNode, on: boolean) => {
+    setBusyId(l.id);
+    const r = await patchCategory(wsId, l.id, on ? "prevention" : "");
+    setBusyId(null);
+    if (r.ok) { patchInto(r.node); setFlash(on ? "이 기록을 장애 보고서의 재발 방지·후속 조치 칸에 싣습니다 — 이미 만든 보고서는 [다시 만들기]를 눌러 주세요" : "재발 방지 표시를 해제했습니다"); }
+    else setFlash(r.message);
+  };
   const applyStatus = async (id: number, status: "active" | "deprecated", cascade = false, reason?: string) => {
     setBusyId(id);
     setAsk(null);
@@ -240,6 +248,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                                     {l.keywords.map((k) => <Chip key={k}>#{k}</Chip>)}
                                     {l.refine_status === "done" ? <Chip tone="primary">검색 가능</Chip> : <Chip tone="warn">{l.refine_status === "failed" ? "정리 실패" : "정리 중"}</Chip>}
                                     {l.status === "deprecated" && <Chip tone="warn" title={l.deprecate_reason ? `사유: ${l.deprecate_reason}` : undefined}>폐기{l.deprecate_reason && ` · ${l.deprecate_reason}`}</Chip>}
+                                    {l.category === "prevention" && <Chip tone="dark" title="장애 보고서의 재발 방지·후속 조치 칸에 실리는 기록">재발 방지</Chip>}
                                   </div>
                                   <div className="flex items-center text-xs text-ink-muted">{l.author_name}
                                     <Link href={`/w/${wsId}/logs/new?parent=${l.id}`} className="ml-auto inline-flex items-center gap-1 font-medium text-primary-700 hover:underline pointer-coarse:min-h-11"><Plus className="size-3" /> 이 로그 아래에 추가</Link>
@@ -252,6 +261,12 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                                       <Button variant="outline" size="xs" onClick={() => setStatus(l.id, "active")} disabled={busyId === l.id} title="검색에 다시 포함"><RotateCcw className="size-3" /> 복원</Button>
                                     ) : (
                                       <Button variant="outline" size="xs" onClick={() => setStatus(l.id, "deprecated")} disabled={busyId === l.id} title="검색에서 뺍니다. 내용과 연결은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-3" /> 폐기</Button>
+                                    )}
+                                    {l.type === "success" && l.root_id !== l.id && l.status === "active" && (
+                                      <Button variant="outline" size="xs" onClick={() => setPrevention(l, l.category !== "prevention")} disabled={busyId === l.id}
+                                        title="같은 문제가 다시 생기지 않게 새로 만들거나 바꿔 둔 것(경보·점검 항목·표준·자동화)과 장애 뒤의 후속 조치(사후 검토·공지·보상)에 표시합니다. 장애를 멈추거나 복구한 일은 표시하지 않습니다">
+                                        <ShieldCheck className="size-3" /> {l.category === "prevention" ? "재발 방지 표시 해제" : "재발 방지로 표시"}
+                                      </Button>
                                     )}
                                   </div>
                                   {AskBox({ id: l.id })}
@@ -393,6 +408,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex min-w-0 items-start gap-2">
                                   <TypeBadge type={l.type} />
+                                  {l.category === "prevention" && <span className="mt-0.5 shrink-0 rounded-full bg-ink px-1.5 text-xs text-white" title="재발 방지·후속 조치로 표시한 기록">재발 방지</span>}
                                   <button type="button" onClick={(e) => { e.stopPropagation(); select(l.id); openFlow(); }} className={cn("min-w-0 line-clamp-2 text-left text-sm font-semibold leading-snug text-ink", l.status === "deprecated" && "line-through opacity-60")}>{l.title}</button>
                                 </div>
                                 <span className="shrink-0 text-xs text-ink-muted">{fmt(l.created_at)}</span>

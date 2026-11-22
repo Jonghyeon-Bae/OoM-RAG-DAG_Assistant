@@ -42,7 +42,7 @@ export interface LogNode {
   deprecate_reason: string | null; // 폐기 사유. 연쇄 폐기된 하위에도 같은 사유 (UX-003 D3)
   root_id: number; // 소속 장애 건의 루트 노드 id (서버 계산)
   depth: number | null;
-  category: "cause" | null; // 장애 건의 원인으로 표시한 기록
+  category: "cause" | "prevention" | null; // cause = 장애 건의 원인으로 표시한 실패 기록, prevention = 재발 방지·후속 조치로 표시한 성공 기록(백엔드 #58)
   tags: string[];
   created_at: string;
 }
@@ -268,7 +268,7 @@ export interface Me {
   position?: string | null; // 직책
   email: string | null;
   workspace_id: number | null;
-  workspaces: { id: number; name: string; policy_enabled: boolean; case_enabled: boolean; role: string; can_configure: boolean }[]; // kind='dept' 만
+  workspaces: { id: number; name: string; policy_enabled: boolean; case_enabled: boolean; role: string; can_configure: boolean; permissions?: string[] }[]; // kind='dept' 만
   must_change_password: boolean;
   consent_required: boolean;
   password_expires_at: string | null;

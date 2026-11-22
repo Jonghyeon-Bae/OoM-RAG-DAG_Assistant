@@ -162,6 +162,7 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
         {cur.pending_status === "generating" && (timedOut
           ? <Notice tone="warn">새 보고서를 아직 만드는 중입니다 — 지금은 이전 보고서입니다. <Button size="sm" variant="outline" onClick={refresh}><RefreshCw className="size-3.5" /> 새로고침</Button></Notice>
           : <Notice><Loader2 className="size-4 animate-spin" /> 새로 만드는 중 — 완성되면 바뀝니다. 지금은 {fmtDateTime(cur.generated_at)}에 만든 보고서입니다</Notice>)}
+        {ai === "off" && !cur.pending_status && !cur.stale && <Notice>AI 문장 없이 만든 보고서입니다. 서버에 AI 키를 넣었다면 다시 만들 수 있습니다. {regen}</Notice>}
         {cur.status === "failed" && <Notice tone="fail">AI 문장 칸을 만들지 못했습니다. 사실 칸은 기록 그대로입니다. {regen}</Notice>}
         {cur.pending_status === "failed" && <Notice tone="fail">다시 만들지 못했습니다 — 이전 보고서를 보여 줍니다. {regen}</Notice>}
         {cur.stale && cur.status !== "generating" && cur.pending_status !== "generating" && cur.status !== "failed" && cur.pending_status !== "failed" && (
