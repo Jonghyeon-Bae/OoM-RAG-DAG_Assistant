@@ -25,7 +25,7 @@ export function Markdown({ text, className }: { text: string; className?: string
       const [head, , ...body] = rows; // 둘째 줄은 |---| 구분선
       out.push(
         <div key={k} className="overflow-x-auto">
-          <table className="w-full min-w-[420px] border-collapse text-xs">
+          <table className="w-full min-w-[26.25rem] border-collapse text-xs">
             <thead><tr>{cells(head).map((c, j) => <th key={j} className="border border-border bg-primary-100 px-2 py-1 text-left font-semibold text-ink">{inline(c, `${k}h${j}`)}</th>)}</tr></thead>
             <tbody>{body.map((r, ri) => <tr key={ri}>{cells(r).map((c, j) => <td key={j} className="border border-border px-2 py-1 align-top">{inline(c, `${k}r${ri}c${j}`)}</td>)}</tr>)}</tbody>
           </table>

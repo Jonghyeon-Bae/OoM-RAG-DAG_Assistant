@@ -32,7 +32,7 @@ export function DeptSettingsPanel({ initial }: { initial: ManageableWorkspace[] 
       <label key={k} className="flex items-center gap-2 text-sm" title={last ? "규정과 해결 사례를 모두 끌 수는 없습니다" : hint}>
         <button type="button" role="switch" aria-checked={on} aria-label={`${w.name} ${label}`} disabled={last || busy !== null} onClick={() => toggle(w, k)}
           className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? "bg-primary-700" : "bg-ref-bg"}`}>
-          <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${on ? "left-[18px]" : "left-0.5"}`} />
+          <span className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${on ? "left-[1.125rem]" : "left-0.5"}`} />
         </button>
         <span className="text-ink">{label}</span>
       </label>

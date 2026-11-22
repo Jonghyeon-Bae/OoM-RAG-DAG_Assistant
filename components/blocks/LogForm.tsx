@@ -135,7 +135,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         <Input id="log-title" name="title" className="h-11" placeholder={guide[type].title} required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
       <Field label="내용" htmlFor="log-body">
-        <Textarea id="log-body" name="body" className="min-h-[120px]" placeholder={guide[type].body} required />
+        <Textarea id="log-body" name="body" className="min-h-[7.5rem]" placeholder={guide[type].body} required />
       </Field>
 
       {type === "success" && parent !== ROOT && (

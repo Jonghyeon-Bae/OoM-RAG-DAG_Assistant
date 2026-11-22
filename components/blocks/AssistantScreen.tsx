@@ -582,7 +582,7 @@ function AnswerCard({ turn, collapsed, highlighted, activeRef, onOpen, onCite, o
         </div>
         {why && (
           <div className={cn("mt-3 rounded-xl border px-4 py-3", trustSoft[trust.level])}>
-            <ul className="flex flex-col gap-1.5 text-[13px] font-medium text-ink">
+            <ul className="flex flex-col gap-1.5 text-[0.8125rem] font-medium text-ink">
               {trust.reasons.map((r, i) => (
                 <li key={i} className="flex items-start gap-2">
                   {r.ok ? <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> : trust.level === "none" ? <CircleMinus className="mt-0.5 size-4 shrink-0 text-ref" aria-hidden /> : <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />}

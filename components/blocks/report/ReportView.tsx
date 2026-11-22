@@ -189,7 +189,8 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
 
         <Sec n="1" title="한눈에 보기" tag={aiTag}>
           {c.summary.length ? <Sentences s={c.summary} to={to} /> : <Empty>{aiEmpty(ai)}</Empty>}
-          {c.summary.length > 0 && !c.causes.length && <p className="mt-1 text-xs text-ink-muted print:hidden">원인으로 표시된 기록이 없습니다 — 원인을 말하는 문장이 있다면 AI 의 추정입니다.</p>}
+          {/* 옛 판(지시문 1)만 — 새 판(2~)은 원인 표시가 없으면 원인 문장을 싣지 않는다(백엔드 PR #52) */}
+          {cur.prompt_version === "1" && c.summary.length > 0 && !c.causes.length && <p className="mt-1 text-xs text-ink-muted print:hidden">원인으로 표시된 기록이 없습니다 — 원인을 말하는 문장이 있다면 AI 의 추정입니다.</p>}
         </Sec>
 
         <Sec n="2" title="발생 현황">
@@ -326,7 +327,7 @@ function Sentences({ s, inline, to }: { s: ReportSentence[]; inline?: boolean; t
 function Table({ head, children }: { head: string[]; children: React.ReactNode }) {
   return (
     <div className="overflow-x-auto print:overflow-visible">
-      <table className="w-full min-w-[520px] text-left text-sm print:min-w-0 [&_td]:border-t [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top">
+      <table className="w-full min-w-[32.5rem] text-left text-sm print:min-w-0 [&_td]:border-t [&_td]:border-border [&_td]:px-2 [&_td]:py-1.5 [&_td]:align-top">
         <thead><tr className="text-xs text-ink-muted">{head.map((h) => <th key={h} className="whitespace-nowrap px-2 py-1 font-medium">{h}</th>)}</tr></thead>
         <tbody>{children}</tbody>
       </table>

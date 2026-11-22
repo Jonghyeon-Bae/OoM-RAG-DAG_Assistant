@@ -282,7 +282,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
   const shown = groups.slice(0, limit);
 
   return (
-    <main className="grid items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:grid-cols-[460px_minmax(0,1fr)] xl:p-8">
+    <main className="grid items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(20rem,25rem)_minmax(0,1fr)] xl:grid-cols-[28.75rem_minmax(0,1fr)] xl:p-8">
       {flash && (
         <div role="status" className="fixed inset-x-3 top-3 z-50 flex items-center gap-3 sm:inset-x-auto sm:right-6 sm:top-6 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-lg">
           <span className="text-ink">{flash}</span>
@@ -338,7 +338,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                   </button>
                   <div className="min-w-0 flex-1">
                     <button type="button" onClick={() => { select(g.root.id); setOpen((o) => new Set(o).add(g.root.root_id)); openFlow(); }} className="block w-full text-left pointer-coarse:-my-2.5 pointer-coarse:py-2.5">
-                      <div className={cn("text-[15px] font-bold leading-snug text-ink", g.resolved && "line-through opacity-70")}>{g.root.title}</div>
+                      <div className={cn("text-[0.9375rem] font-bold leading-snug text-ink", g.resolved && "line-through opacity-70")}>{g.root.title}</div>
                     </button>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
                       <TypeBadge type={g.root.type} />
@@ -387,7 +387,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       const depth = Math.max(0, l.path_label.split(".").length - g.root.path_label.split(".").length - 1);
                       return (
                         <li key={l.id} ref={(el) => { if (el) cardRefs.current.set(l.id, el); else cardRefs.current.delete(l.id); }} className="relative mb-2.5 last:mb-0" style={{ marginLeft: depth * 12 }}>
-                          <span className={cn("absolute -left-[21px] top-4 size-2.5 rounded-full ring-4 ring-card sm:-left-[25px]", dotTone[l.type])} />
+                          <span className={cn("absolute -left-[1.3125rem] top-4 size-2.5 rounded-full ring-4 ring-card sm:-left-[1.5625rem]", dotTone[l.type])} />
                           <div onClick={() => { select(l.id); openFlow(); }} className={cn("block w-full text-left", g.dim.has(l.id) && "opacity-50")}>
                             <div className={cn("rounded-lg border border-transparent px-2.5 py-2.5 transition-colors sm:px-3 hover:bg-primary-50", selected && "border-primary-400 bg-primary-50")}>
                               <div className="flex items-start justify-between gap-2">

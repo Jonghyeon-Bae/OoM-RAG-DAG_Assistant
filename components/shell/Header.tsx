@@ -18,7 +18,7 @@ export function Header({
   right?: React.ReactNode;
 }) {
   return (
-    <header className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-x-3 border-b-2 border-primary-200 bg-card px-3 py-2 md:px-6 lg:min-h-20 lg:px-8 lg:py-3">
+    <header className="sticky top-0 z-30 flex min-h-14 items-center justify-between gap-x-3 border-b-2 border-primary-200 bg-card px-3 py-2 md:px-6 lg:min-h-20 lg:px-8 lg:py-3 xl:px-[max(2rem,calc((100%_-_110rem)_/_2_+_2rem))]">
       {/* 휴대폰·태블릿: 로고 줄을 따로 두지 않고 헤더 한 줄에 합친다(D-008) */}
       <Link href="/" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-700 text-sm font-bold text-white lg:hidden" title="OoM Assist">O</Link>
       <div className="min-w-0 flex-1">

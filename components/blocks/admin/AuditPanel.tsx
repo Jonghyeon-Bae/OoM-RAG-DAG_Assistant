@@ -73,7 +73,7 @@ export function AuditPanel() {
             ))}
           </ul>
           <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="w-full min-w-[40rem] text-sm">
               <thead><tr className="border-b border-border text-left text-xs text-ink-muted"><th className="py-2 font-medium">일시</th><th className="font-medium">구분</th><th className="font-medium">동작</th><th className="font-medium">대상 사번</th><th className="font-medium">한 사람</th><th className="font-medium">IP</th><th className="font-medium">내용</th></tr></thead>
               <tbody>
                 {items.map((i) => (

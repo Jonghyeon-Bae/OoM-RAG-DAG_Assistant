@@ -42,7 +42,7 @@ export function RegisterScreen({ wsId, candidates: initialCandidates, initialRec
   // 폰·태블릿: AI 정리 결과·최근 등록은 버튼으로 여는 창(UX-005 §3-2, #112). PC 는 오른쪽 칸 그대로
   const [sheetOpen, setSheetOpen] = useState(false);
   return (
-    <main className="grid items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(340px,420px)_minmax(0,1fr)] xl:grid-cols-[440px_minmax(0,1fr)] xl:p-8">
+    <main className="grid items-start gap-4 p-3 sm:gap-6 md:p-6 lg:grid-cols-[minmax(21.25rem,26.25rem)_minmax(0,1fr)] xl:grid-cols-[27.5rem_minmax(0,1fr)] xl:p-8">
       <Toast message={toast?.message ?? null} href={toast?.href} onClose={() => setToast(null)} onResult={() => setSheetOpen(true)} />
       <Card className="min-w-0 overflow-visible p-4 sm:p-6">{/* overflow-visible: 고정 등록 바(sticky)가 카드 안에서 동작하도록 */}
         <div className="mb-4 flex items-center justify-between gap-2 sm:mb-5">

@@ -32,7 +32,7 @@ export function Sidebar({ wsId, policyEnabled, caseEnabled, adminMenu }: { wsId:
     });
   return (
     <>
-      <aside className="sticky top-0 z-40 hidden h-screen shrink-0 flex-col border-r border-border bg-sidebar lg:flex lg:w-[72px] xl:w-60 print:!hidden">
+      <aside className="sticky top-0 z-40 hidden h-screen shrink-0 flex-col border-r border-border bg-sidebar lg:flex lg:w-[4.5rem] xl:w-60 print:!hidden">
         <Link href="/" className="flex h-20 items-center justify-center gap-2.5 xl:justify-start xl:px-6" title="OoM Assist">
           <span className="flex size-8 items-center justify-center rounded-full bg-primary-700 text-sm font-bold text-white">O</span>
           <span className="hidden text-lg font-bold text-ink xl:inline">OoM Assist</span>
