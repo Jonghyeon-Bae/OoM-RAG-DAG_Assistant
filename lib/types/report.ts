@@ -28,6 +28,7 @@ export interface ReportContent {
   impact: ReportSentence[];
   prevention: (ReportSentence & { owner?: string | null; due?: string | null })[];
   open_items: ReportSentence[];
+  prevention_refs?: string[]; // 팀이 "재발 방지"로 표시한 기록 번호 — 표시가 있을 때만 온다(백엔드 #58). 있으면 prevention 은 AI 가 고른 것이 아니라 표시한 기록이다
   records: { ref: string; id: number; kind: ReportKind; title: string; at: string; author: string | null }[];
 }
 
