@@ -1,5 +1,6 @@
 import type { ReportAudience, ReportContent, ReportKind, ReportSentence } from "@/lib/types/report";
 import type { Report } from "@/lib/types/report";
+import { fmtKst } from "@/lib/datetime";
 
 // 장애 보고서 R1 — 표기·Markdown (FE-REQ-005). 내용은 서버 /reports 의 content 를 그대로 쓴다(#118).
 // #114 의 화면 쪽 조립(assembleReport)은 서버가 같은 규칙으로 조립하게 되어 지웠다 — 규정 표 묶기만 화면에서 한다(회신 §3.4).
@@ -30,12 +31,7 @@ export const EMPTY = {
   open: "남은 확인 없음", // open_items 는 서버 사실 칸 — 비면 남은 것이 없다는 뜻
 } as const;
 
-export const fmtDateTime = (iso: string | null) => {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-};
+export const fmtDateTime = (iso: string | null) => fmtKst(iso, "YYYY-MM-DD HH:mm");
 export const fmtShort = (iso: string) => fmtDateTime(iso).slice(5);
 export function fmtDuration(min: number | null, from?: string) {
   if (min == null) {

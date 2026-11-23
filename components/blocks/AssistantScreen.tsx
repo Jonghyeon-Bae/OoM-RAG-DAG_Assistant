@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Chip, cn } from "@/components/ui";
+import { fmtKst } from "@/lib/datetime";
 import { ChainBlock } from "@/components/blocks/ChainBlock";
 import { SourceViewer } from "@/components/blocks/SourceViewer";
 import { EvidenceBody, EvidenceSheet, type EvidenceTab } from "@/components/blocks/EvidenceSheet";
@@ -127,7 +128,7 @@ const chainFromEvent = (e: ChainEvent): Chain => ({
     policy_refs: (n.policy ?? []).map((p) => ({ relation: p.relation, policy: null, article: null, note: p.note ?? null, topic: p.topic ?? null, doc_title: null, article_label: p.label ?? null, revision: p.revision ?? null, from_label: p.from_version ?? null })),
   })),
 });
-const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+const fmtTime = (iso: string) => fmtKst(iso, "HH:mm");
 const isNarrow = () => window.matchMedia("(max-width: 1023px)").matches; // 폰·태블릿(오른쪽 칸이 없는 폭)인가
 export function AssistantScreen({ ws }: { ws: Workspace }) {
   const [state, dispatch] = useReducer(reducer, { turns: [] });
@@ -327,7 +328,7 @@ export function AssistantScreen({ ws }: { ws: Workspace }) {
 
         <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-20 mt-4 bg-background pb-2 pt-2 lg:static">
           <form className="flex items-center gap-3 rounded-2xl border border-border bg-card p-2 pl-5 shadow-sm" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
-            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder={modeHint[mode]} className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"/>
+            <Input value={input} maxLength={4000} onChange={(e) => setInput(e.target.value)} placeholder={modeHint[mode]} className="h-11 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"/>
             {streaming ? (
               <Button type="button" variant="outline" size="lg" className="size-11 rounded-full p-0" onClick={stop} aria-label="중지"><Square className="size-4" /></Button>
             ) : (
@@ -377,12 +378,11 @@ function HistoryPanel({ history, onPick, onClose }: { history: { items: SearchSe
               <button type="button" onClick={() => onPick(x)} className="flex w-full flex-col gap-1 px-1 py-2.5 text-left hover:bg-primary-50">
                 <span className="line-clamp-2 text-sm text-ink">{x.query}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
-                  <span className="tabular-nums">{new Date(x.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="tabular-nums">{fmtKst(x.created_at, "M. D. HH:mm")}</span>
                   <Chip className="h-5 text-xs">{intentLabel[x.intent]}</Chip>
                   {x.status !== "done" && <Chip tone={x.status === "error" ? "fail" : "warn"} className="h-5 text-xs">{x.status === "error" ? "중단됨" : "진행 중"}</Chip>}
                   <span>근거 {x.citations?.verified.length ?? 0}</span>
                   {x.score === 1 ? <span>👍</span> : x.score === -1 ? <span>👎</span> : null}
-                  <span className="ml-auto">{x.user_name}</span>
                 </span>
               </button>
             </li>

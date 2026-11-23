@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Chip, TypeBadge, cn } from "@/components/ui";
+import { fmtKst } from "@/lib/datetime";
 import type { DashboardSummary, Intent } from "@/lib/types/domain";
 
 const intentLabel: Record<Intent, string> = { policy: "규정 확인", troubleshoot: "장애 해결", both: "규정 + 해결 사례" };
 const fmtHours = (h: number) => (h < 1 ? `${Math.round(h * 60)}분` : h < 48 ? `${h.toFixed(1)}시간` : `${(h / 24).toFixed(1)}일`);
-const fmtAt = (iso: string) => new Date(iso).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const fmtAt = (iso: string) => fmtKst(iso, "M. D. HH:mm");
 
 function Kpi({ label, value, sub, subTone = "neutral", sample = false }: { label: string; value: React.ReactNode; sub?: string; subTone?: "neutral" | "fail" | "primary"; sample?: boolean }) {
   return (
@@ -116,7 +117,7 @@ export function DashboardView({ wsId, data }: { wsId: number; data: DashboardSum
             <h2 className="font-bold text-ink">답을 못 한 질문</h2>
             <span className="text-xs text-ink-muted">최근 5건 · 다음에 등록할 것</span>
           </div>
-          {noEv.recent.length === 0 ? <p className="text-sm text-ink-muted">아직 없습니다. 모든 질문에 근거가 있었습니다.</p> : (
+          {noEv.recent.length === 0 ? <p className="text-sm text-ink-muted">{noEv.rate ? "내 질문 가운데 근거 없이 끝난 것은 없습니다." : "아직 없습니다. 모든 질문에 근거가 있었습니다."}</p> : (
             <ul className="divide-y divide-border">
               {noEv.recent.map((q) => (
                 <li key={q.session_id} className="flex items-center gap-3 py-2 text-sm">

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Chip } from "@/components/ui";
 import { fetchAudit } from "@/lib/api/client";
 import type { AuditItem } from "@/lib/types/domain";
+import { fmtKst } from "@/lib/datetime";
 
 // 접속 기록 (#121) — GET /audit, 회사 관리자만. 로그인·잠금·비밀번호·내 정보 정정·멤버 관리·부서 설정 변경을 최신순으로.
 // 읽기 전용이다. IP 는 서버가 가려서 준다. 조건은 서버로 보낸다(사번·종류·기간) — 받은 뒤 화면에서 거르지 않는다.
@@ -18,7 +19,7 @@ const actionLabel: Record<string, string> = {
 };
 const categoryLabel: Record<AuditItem["category"], string> = { auth: "접속", member: "멤버", settings: "설정" };
 const warnActions = new Set(["login_failed", "login_rejected_locked", "account_locked", "user_deactivated"]);
-const fmt = (iso: string) => new Date(iso).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+const fmt = (iso: string) => fmtKst(iso, "MM. DD. HH:mm:ss");
 const nextDay = (d: string) => { const x = new Date(`${d}T00:00:00`); x.setDate(x.getDate() + 1); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; };
 const LIMIT = 200;
 

@@ -9,6 +9,7 @@ import { Chip, Field, cn } from "@/components/ui";
 import { downloadUploadFile, fetchUpload, fetchUploads, uploadAction, uploadPolicy } from "@/lib/api/client";
 import type { PolicyDocument, PolicyUpload, UploadStatus } from "@/lib/types/domain";
 import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
+import { fmtKst } from "@/lib/datetime";
 
 // 규정 파일 올리기 → (AI 워커) 자동 변환 → 검수(변환본 확인·수정) → 승인 → (AI 워커) 등록 (백엔드 #44, #109)
 // 상태: converting → review ⇄(변환본 저장 시 converting) → indexing → approved / rejected / failed → retry
@@ -17,7 +18,7 @@ const statusTone: Record<UploadStatus, "neutral" | "primary" | "warn" | "fail" |
 const working = (s: UploadStatus) => s === "converting" || s === "indexing";
 const ACCEPT = ".pdf,.hwp,.hwpx,.docx,.md,.txt";
 const SLUG = /^[a-z0-9][a-z0-9-]{2,79}$/;
-const fmtAt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-");
+const fmtAt = (iso: string | null) => fmtKst(iso, "M. D. HH:mm");
 const size = (b: number) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1024))}KB`);
 // 파일 이름에서 문서 ID 후보 — 영문·숫자만 남긴다(한글 이름이면 빈 칸 → 직접 입력)
 const slugFrom = (name: string) => name.replace(/\.[^.]+$/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
@@ -51,7 +52,7 @@ export function UploadsPanel({ wsId, initial, docs, canUpload, companyAdmin, onA
     <div className="grid items-start gap-4 sm:gap-6 lg:grid-cols-[minmax(18.75rem,23.75rem)_minmax(0,1fr)]">
       <div className="flex min-w-0 flex-col gap-4">
         {canUpload ? <UploadForm wsId={wsId} docs={docs} companyAdmin={companyAdmin} onAdded={added} /> : (
-          <Card className="p-4 text-sm text-ink-muted">규정 파일은 부서 관리자가 올립니다. 여기서는 진행 상황과 변환 결과를 볼 수 있습니다.</Card>
+          <Card className="p-4 text-sm text-ink-muted">규정 파일은 부서 관리자가 올리고 검수합니다. 승인된 파일만 여기에 보입니다.</Card>
         )}
         <Card className="min-w-0 gap-0 p-0">
           <div className="flex items-center justify-between border-b px-4 py-3">
@@ -121,14 +122,14 @@ function UploadForm({ wsId, docs, companyAdmin, onAdded }: { wsId: number; docs:
           </select>
         </Field>
         <div className="grid grid-cols-[1fr_120px] gap-2">
-          <Field label="문서 제목" htmlFor="up-title"><Input id="up-title" value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="예: 배포·장애 대응 운영지침" required /></Field>
-          <Field label="판" htmlFor="up-ver"><Input id="up-ver" value={f.version} onChange={(e) => setF({ ...f, version: e.target.value })} placeholder="2027-01" required /></Field>
+          <Field label="문서 제목" htmlFor="up-title"><Input id="up-title" maxLength={200} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="예: 배포·장애 대응 운영지침" required /></Field>
+          <Field label="판" htmlFor="up-ver"><Input id="up-ver" maxLength={30} value={f.version} onChange={(e) => setF({ ...f, version: e.target.value })} placeholder="2027-01" required /></Field>
         </div>
         <Field label="문서 ID" htmlFor="up-slug" hint="영문 소문자·숫자·하이픈 3~80자. 판마다 달라야 합니다(예: retail-deploy-2027-01).">
           <Input id="up-slug" value={f.slug} onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase() })} aria-invalid={!!f.slug && !slugOk} placeholder="retail-deploy-2027-01" required />
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="종류 (선택)" htmlFor="up-type"><Input id="up-type" value={f.doc_type} onChange={(e) => setF({ ...f, doc_type: e.target.value })} placeholder="지침 · 규정 · FAQ" /></Field>
+          <Field label="종류 (선택)" htmlFor="up-type"><Input id="up-type" maxLength={30} value={f.doc_type} onChange={(e) => setF({ ...f, doc_type: e.target.value })} placeholder="지침 · 규정 · FAQ" /></Field>
           <Field label="적용 범위">
             <div role="radiogroup" className="flex h-10 items-center gap-3 text-sm pointer-coarse:h-11">
               <label className="flex items-center gap-1.5"><input type="radio" checked={f.scope === "dept"} onChange={() => setF({ ...f, scope: "dept" })} /> 이 부서</label>
@@ -259,7 +260,7 @@ function UploadDetail({ wsId, id, onChanged, onApproved }: { wsId: number; id: n
         <div className="flex flex-col gap-2 border-t border-border pt-3">
           {rejecting !== null ? (
             <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(e) => { e.preventDefault(); if (rejecting.trim()) act("reject", { reason: rejecting.trim() }); }}>
-              <Input autoFocus value={rejecting} onChange={(e) => setRejecting(e.target.value)} placeholder="반려 사유 (예: 원본이 구판입니다)" />
+              <Input autoFocus maxLength={300} value={rejecting} onChange={(e) => setRejecting(e.target.value)} placeholder="반려 사유 (예: 원본이 구판입니다)" />
               <div className="flex gap-2">
                 <Button type="submit" size="sm" disabled={busy || !rejecting.trim()}>반려</Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setRejecting(null)}>취소</Button>
