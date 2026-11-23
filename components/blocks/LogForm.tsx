@@ -128,14 +128,14 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
 
       {type === "success" && parent === ROOT && (
         <Field label="어떤 문제였나요?" htmlFor="log-problem" hint="장애 건은 문제(실패)로 시작합니다. 한 줄만 적으면 그 아래에 이 해결 기록이 들어가고 바로 완료 처리됩니다.">
-          <Input id="log-problem" name="problem_title" className="h-11" placeholder="예: 이미지 업로드 시 413 오류" required />
+          <Input id="log-problem" name="problem_title" maxLength={200} className="h-11" placeholder="예: 이미지 업로드 시 413 오류" required />
         </Field>
       )}
       <Field label="제목" htmlFor="log-title">
-        <Input id="log-title" name="title" className="h-11" placeholder={guide[type].title} required value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Input id="log-title" name="title" maxLength={200} className="h-11" placeholder={guide[type].title} required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
       <Field label="내용" htmlFor="log-body">
-        <Textarea id="log-body" name="body" className="min-h-[7.5rem]" placeholder={guide[type].body} required />
+        <Textarea id="log-body" name="body" maxLength={5000} className="min-h-[7.5rem]" placeholder={guide[type].body} required />
       </Field>
 
       {type === "success" && parent !== ROOT && (

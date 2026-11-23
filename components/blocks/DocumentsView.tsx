@@ -7,6 +7,7 @@ import { deleteDoc, fetchDocChunks, fetchDocEvents, fetchDocs, patchDocStatus } 
 import { UploadsPanel } from "@/components/blocks/documents/UploadsPanel";
 import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
 import { History } from "lucide-react";
+import { fmtKst } from "@/lib/datetime";
 import type { DocEvent, DocStatus, PolicyChunk, PolicyDocument, PolicyUpload, SourceType } from "@/lib/types/domain";
 
 // 규정 문서 관리 (백엔드 #37·#44, #109). 탭: 등록된 문서(폐기·복원·삭제·조문·이력) / 올리기·검수(업로드 → 자동 변환 → 검수 → 승인)
@@ -14,7 +15,7 @@ import type { DocEvent, DocStatus, PolicyChunk, PolicyDocument, PolicyUpload, So
 const srcLabel: Record<SourceType, string> = { pdf: "PDF", hwp: "HWP", markdown: "Markdown", json: "JSON" };
 const actionLabel: Record<string, string> = { uploaded: "등록", indexed: "등록(색인)", superseded: "새 판으로 대체", retired: "폐기", restored: "복원", deleted: "삭제" };
 const actionTone: Record<string, "neutral" | "primary" | "warn" | "fail" | "dark"> = { uploaded: "neutral", indexed: "primary", superseded: "dark", retired: "dark", restored: "primary", deleted: "fail" };
-export const fmtAt = (iso: string | null) => (iso ? new Date(iso).toLocaleString("ko-KR", { year: "2-digit", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-");
+export const fmtAt = (iso: string | null) => fmtKst(iso, "YY. M. D. HH:mm");
 
 type Ask = { kind: "retire" | "delete"; id: number; reason: string };
 type Panel = { kind: "events"; doc: PolicyDocument | null; items: DocEvent[] } | { kind: "chunks"; doc: PolicyDocument; items: PolicyChunk[] };

@@ -260,7 +260,7 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
           ) : <Empty>{EMPTY.policy}</Empty>}
         </Sec>
 
-        <Sec n="8" title="재발 방지·후속 조치" tag={c.prevention.length > 0 && <AiTag />}>
+        <Sec n="8" title="재발 방지·후속 조치" tag={c.prevention.length > 0 && (c.prevention_refs?.length ? <TeamTag /> : <AiTag />)}>
           {c.prevention.length ? (
             <Table head={["조치", "근거", "담당", "기한"]}>
               {c.prevention.map((p, i) => <tr key={i}><td>{p.text}</td><td><Refs refs={p.refs} to={to} /></td><td>{p.owner ?? ""}</td><td>{p.due ?? ""}</td></tr>)}
@@ -292,6 +292,10 @@ function Notice({ tone, children }: { tone?: "warn" | "fail"; children: React.Re
   return (
     <p className={cn("flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-xs text-ink", tone === "fail" ? "bg-fail-bg" : tone === "warn" ? "bg-warn-bg/60" : "bg-primary-50")}>{children}</p>
   );
+}
+// 재발 방지 칸: 팀이 표시한 기록이면 "무엇을 실을지"는 사람이 골랐고 문장만 AI 가 다듬는다 — AI 가 고른 경우와 구분한다(#128)
+function TeamTag() {
+  return <span className="rounded bg-success-bg px-1.5 py-0.5 text-xs font-normal text-success print:ring-1 print:ring-border" title="타임라인에서 '재발 방지로 표시'한 기록입니다. 문장은 AI 가 기록을 바탕으로 다듬었습니다">팀이 표시한 기록</span>;
 }
 function AiTag({ inline }: { inline?: boolean }) {
   return <span className={cn("rounded bg-primary-50 px-1.5 py-0.5 text-xs font-normal text-primary-700 print:ring-1 print:ring-border", inline && "ml-1")}>AI 작성 — 원문 확인</span>;

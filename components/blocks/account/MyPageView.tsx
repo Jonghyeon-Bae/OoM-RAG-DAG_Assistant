@@ -12,13 +12,14 @@ import { modeOf, modeShort, modeTone } from "@/lib/mode";
 import { ACCOUNT_API_READY, setPrimaryWorkspace, updateProfile } from "@/lib/api/client";
 import { Input } from "@/components/ui/input";
 import type { Me } from "@/lib/types/domain";
+import { fmtKst } from "@/lib/datetime";
 
 // 마이페이지 (D-5, FE-013 §3.6, #090 디자인 정리). 백엔드에 있는 것만 보여준다: GET /me, PATCH /auth/password.
 // - 이름·직급·직책·이메일 정정: PATCH /me (#121). 사번·소속·역할은 관리자만
 // - "기본" = me.workspace_id(로그인하면 처음 열리는 부서). 본인이 [기본으로] 지정(REQ-7, 백엔드 feat/admin-account — 병합 전에는 버튼 비활성), 지정이 없으면 서버가 admin 소속 우선으로 계산
 // - 주소·휴대전화는 받지 않는다 (D-7)
 const roleLabel: Record<string, string> = { admin: "관리자", member: "멤버" };
-const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+const fmtDate = (iso: string) => fmtKst(iso, "YYYY년 M월 D일");
 
 function Section({ icon, title, desc, children, action }: { icon: React.ReactNode; title: string; desc?: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (

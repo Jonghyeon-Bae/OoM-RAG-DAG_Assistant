@@ -113,7 +113,7 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
         {c?.kind === "deactivate" && (
           <div className="flex flex-col gap-2 rounded-md border border-fail-bg bg-card p-2.5 text-xs text-ink">
             <span><b>{m.name}</b> 계정을 비활성화합니다. 모든 부서에서 로그인할 수 없게 되고, 작성한 기록·감사 기록은 남습니다. 회사 관리자가 다시 활성화할 수 있습니다.</span>
-            <input value={c.reason} onChange={(e) => setConfirm({ ...c, reason: e.target.value })} placeholder="사유 (예: 퇴사 · 장기 미사용)" className="h-9 rounded-md border border-border bg-white px-2 text-xs pointer-coarse:h-11" />
+            <input value={c.reason} maxLength={300} onChange={(e) => setConfirm({ ...c, reason: e.target.value })} placeholder="사유 (예: 퇴사 · 장기 미사용)" className="h-9 rounded-md border border-border bg-white px-2 text-xs pointer-coarse:h-11" />
             <div className="flex gap-2"><Button size="xs" disabled={acting || !c.reason.trim()} onClick={() => deactivate(m, c.reason.trim())} className="bg-fail text-white hover:bg-fail/90">비활성화</Button><Button size="xs" variant="ghost" onClick={() => setConfirm(null)}>취소</Button></div>
           </div>
         )}
@@ -191,9 +191,9 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
         <p className="text-xs text-ink-muted">새 사번이면 계정을 만들고 임시 비밀번호를 한 번 보여줍니다. 이미 있는 사번이면 이 워크스페이스 멤버로만 추가합니다. 받은 사람은 첫 로그인 때 개인정보 동의와 비밀번호 변경을 거칩니다.</p>
         <form onSubmit={invite} className="flex flex-col gap-3">
           <Field label="사번" htmlFor="inv-no"><Input id="inv-no" className="h-10" placeholder="OOM0006" value={form.employee_no} onChange={(e) => setForm({ ...form, employee_no: e.target.value })} required pattern="[A-Za-z0-9-]{3,32}" /></Field>
-          <Field label="이름" htmlFor="inv-name"><Input id="inv-name" className="h-10" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
-          <Field label="직함 (선택)" htmlFor="inv-title"><Input id="inv-title" className="h-10" placeholder="예: 매니저" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-          <Field label="이메일 (선택)" htmlFor="inv-email"><Input id="inv-email" type="email" className="h-10" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+          <Field label="이름" htmlFor="inv-name"><Input id="inv-name" maxLength={50} className="h-10" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
+          <Field label="직함 (선택)" htmlFor="inv-title"><Input id="inv-title" maxLength={63} className="h-10" placeholder="예: 매니저" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+          <Field label="이메일 (선택)" htmlFor="inv-email"><Input id="inv-email" type="email" maxLength={254} className="h-10" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
           <fieldset className="flex items-center gap-4 text-sm">
             <legend className="mb-1 text-sm font-medium text-ink">역할</legend>
             {(["member", "admin"] as MemberRole[]).map((r) => (
