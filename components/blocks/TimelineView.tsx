@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText, ShieldCheck } from "lucide-react";
+import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText, ShieldCheck, Crosshair } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Chip, TypeBadge, cn } from "@/components/ui";
 import { ChainGraph } from "@/components/blocks/ChainGraph";
 import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
+import { fmtKst } from "@/lib/datetime";
 import { fetchChain, fetchLog, fetchOrphaned, patchCategory, patchResolved, patchStatus, postRefine } from "@/lib/api/client";
 import type { Chain, LogNode, LogType } from "@/lib/types/domain";
 
@@ -20,11 +21,7 @@ const typeFilters: { key: LogType | "all"; label: string; cls: string }[] = [
 const dotTone: Record<LogType, string> = { fail: "bg-fail", success: "bg-success", ref: "bg-ref" };
 const PAGE = 8;
 
-function fmt(iso: string) {
-  const d = new Date(iso);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
+const fmt = (iso: string) => fmtKst(iso, "MM.DD HH:mm");
 
 type Group = { root: LogNode; nodes: LogNode[]; dim: Set<number>; total: number; hasSuccess: boolean; last: string; resolved: boolean };
 
@@ -122,9 +119,20 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
   };
   // 폐기: 하위가 고아가 되는 노드면 인라인으로 범위를 묻는다 (이 노드만 / 하위 N건 포함). 복원은 함께 폐기됐던 하위도 되살린다.
   const [ask, setAsk] = useState<{ id: number; orphaned: number[]; reason: string } | null>(null);
-  const [note, setNote] = useState<{ id: number; text: string } | null>(null); // 성공 로그 없이 완료할 때 사유 입력
+  // 완료 처리 창: pick = 해결한 기록으로 고른 것(성공 기록이 있을 때), text = 메모(성공 기록이 없거나 하나도 고르지 않으면 필수)
+  const [note, setNote] = useState<{ id: number; text: string; pick?: number[] } | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   // 재발 방지·후속 조치 표시(백엔드 #58) — 상위가 있는 성공 기록만. 표시한 기록이 보고서의 그 칸에 실리고, 저장된 보고서는 "기록이 바뀌었습니다"가 된다
+  // 원인 표시(백엔드 #33) — 상위가 있는 실패 기록만. 보고서 "원인" 칸·한눈에 보기의 원인 문장·체인의 원인 배지가 이것을 쓴다
+  const setCause = async (l: LogNode, on: boolean) => {
+    setBusyId(l.id);
+    const r = await patchCategory(wsId, l.id, on ? "cause" : "");
+    setBusyId(null);
+    if (!r.ok) { setFlash(r.message); return; }
+    patchInto(r.node);
+    setFlash(on ? "이 기록을 장애 건의 원인으로 표시했습니다 — 보고서의 원인 칸에 실립니다" : "원인 표시를 해제했습니다");
+    fetchChain(wsId, entryId).then((c) => c && startTransition(() => setChain(c))); // 흐름의 원인 배지 갱신
+  };
   const setPrevention = async (l: LogNode, on: boolean) => {
     setBusyId(l.id);
     const r = await patchCategory(wsId, l.id, on ? "prevention" : "");
@@ -163,7 +171,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
       <div className="mt-1 flex flex-col gap-2 rounded-lg border border-warn-bg bg-warn-bg/50 px-3 py-2 text-xs text-ink">
         <label className="flex flex-wrap items-center gap-2">
           <span>폐기 사유</span>
-          <input autoFocus value={ask.reason} onChange={(e) => setAsk({ ...ask, reason: e.target.value })} placeholder="예: 잘못 짚은 원인 / 중복 기록" className="h-7 min-w-56 flex-1 rounded-md border border-border bg-white px-2 text-xs" />
+          <input autoFocus value={ask.reason} onChange={(e) => setAsk({ ...ask, reason: e.target.value })} maxLength={300} placeholder="예: 잘못 짚은 원인 / 중복 기록" className="h-7 min-w-56 flex-1 rounded-md border border-border bg-white px-2 text-xs" />
         </label>
         {ask.orphaned.length > 0 && (
           <div>
@@ -186,27 +194,56 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
     );
   };
 
-  // 완료: 이어진 성공 로그가 있으면 바로, 없으면 사유를 받는다(UX-003 D1). 해제는 사유 없음
-  const resolve = async (root: LogNode, value: boolean, text?: string) => {
-    const r = await patchResolved(wsId, root.id, value, text);
+  // 이 장애 건을 해결한 기록 후보 = 그 아래의 활성 성공 기록
+  const successOf = (root: LogNode) => logs.filter((l) => l.root_id === root.id && l.id !== root.id && l.type === "success" && l.status === "active").sort((a, b) => a.created_at.localeCompare(b.created_at));
+  // 완료: 성공 기록이 있으면 "어느 기록이 해결했는지" 고르게 하고(#130, 기본은 전부), 없으면 사유를 받는다(UX-003 D1). 해제는 묻지 않는다
+  const resolve = async (root: LogNode, value: boolean, text?: string, pick?: number[]) => {
+    if (value && pick === undefined && text === undefined) {
+      const cands = successOf(root);
+      if (cands.length) { setNote({ id: root.id, text: "", pick: cands.map((c) => c.id) }); return; }
+    }
+    const r = await patchResolved(wsId, root.id, value, text, value ? pick : undefined);
     if (r.ok) {
       setNote(null);
       setLogs((ls) => ls.map((l) => (l.id === r.node.id ? { ...l, resolved_at: r.node.resolved_at, resolve_note: r.node.resolve_note } : l)));
+      if (root.id === (logs.find((l) => l.id === entryId)?.root_id ?? entryId)) fetchChain(wsId, entryId).then((c) => c && startTransition(() => setChain(c))); // 해결 배지 갱신
     } else if (r.code === "NOTE_REQUIRED") {
-      setNote({ id: root.id, text: "" });
+      setNote((n) => ({ id: root.id, text: n?.id === root.id ? n.text : "", pick: n?.id === root.id ? n.pick : undefined }));
+      setFlash("해결한 기록이 없으면 어떻게 마무리됐는지 적어 주세요");
     } else {
       setFlash(r.message);
     }
   };
-  const NoteBox = ({ root }: { root: LogNode }) =>
-    note?.id === root.id ? (
-      <form className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-success-bg bg-success-bg/40 px-3 py-2 text-xs text-ink" onSubmit={(e) => { e.preventDefault(); if (note.text.trim()) resolve(root, true, note.text.trim()); }}>
-        <span>이어진 해결(성공) 로그가 없습니다. 어떻게 마무리됐나요?</span>
-        <input autoFocus value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} placeholder="예: 재현 안 됨 / 외부 조치로 해소" className="h-7 min-w-56 flex-1 rounded-md border border-border bg-white px-2 text-xs" />
-        <Button size="xs" type="submit" disabled={!note.text.trim()}>완료 처리</Button>
-        <Button size="xs" type="button" variant="ghost" onClick={() => setNote(null)}>취소</Button>
+  const NoteBox = ({ root }: { root: LogNode }) => {
+    if (note?.id !== root.id) return null;
+    const cands = note.pick ? successOf(root) : [];
+    const picked = note.pick ?? [];
+    const needText = picked.length === 0; // 해결한 기록이 없으면 메모가 있어야 한다(서버 NOTE_REQUIRED)
+    const ok = !needText || !!note.text.trim();
+    const toggle = (id: number) => setNote({ ...note, pick: picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id] });
+    return (
+      <form className="mt-1 flex flex-col gap-2 rounded-lg border border-success-bg bg-success-bg/40 px-3 py-2 text-xs text-ink" onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => { e.preventDefault(); if (ok) resolve(root, true, note.text.trim() || undefined, note.pick ? picked : undefined); }}>
+        {cands.length > 0 ? (
+          <fieldset className="flex flex-col gap-1">
+            <legend className="mb-1 font-semibold">이 장애 건을 실제로 해결한 기록을 골라 주세요 <span className="font-normal text-ink-muted">— 보고서의 &ldquo;조치와 결과&rdquo;에 실립니다</span></legend>
+            {cands.map((c) => (
+              <label key={c.id} className="flex items-start gap-2 rounded-md bg-white/70 px-2 py-1.5 pointer-coarse:min-h-11">
+                <input type="checkbox" className="mt-0.5" checked={picked.includes(c.id)} onChange={() => toggle(c.id)} />
+                <span className="min-w-0"><span className="font-medium">{c.title}</span>{c.resolution_summary && <span className="block truncate text-ink-muted">{c.resolution_summary}</span>}</span>
+              </label>
+            ))}
+          </fieldset>
+        ) : <span>이어진 해결(성공) 로그가 없습니다. 어떻게 마무리됐나요?</span>}
+        <div className="flex flex-wrap items-center gap-2">
+          <input autoFocus={cands.length === 0} value={note.text} maxLength={300} onChange={(e) => setNote({ ...note, text: e.target.value })}
+            placeholder={needText ? "예: 재현 안 됨 / 외부 조치로 해소 (필수)" : "완료 메모 (선택)"} className="h-7 min-w-56 flex-1 rounded-md border border-border bg-white px-2 text-xs pointer-coarse:h-11" />
+          <Button size="xs" type="submit" disabled={!ok}>완료 처리{cands.length > 0 && ` · 해결 기록 ${picked.length}건`}</Button>
+          <Button size="xs" type="button" variant="ghost" onClick={() => setNote(null)}>취소</Button>
+        </div>
       </form>
-    ) : null;
+    );
+  };
 
   useEffect(() => {
     cardRefs.current.get(entryId)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -249,6 +286,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                                     {l.refine_status === "done" ? <Chip tone="primary">검색 가능</Chip> : <Chip tone="warn">{l.refine_status === "failed" ? "정리 실패" : "정리 중"}</Chip>}
                                     {l.status === "deprecated" && <Chip tone="warn" title={l.deprecate_reason ? `사유: ${l.deprecate_reason}` : undefined}>폐기{l.deprecate_reason && ` · ${l.deprecate_reason}`}</Chip>}
                                     {l.category === "prevention" && <Chip tone="dark" title="장애 보고서의 재발 방지·후속 조치 칸에 실리는 기록">재발 방지</Chip>}
+                                    {l.category === "cause" && l.root_id !== l.id && <Chip tone="fail" title="장애 건의 원인으로 표시한 기록">원인</Chip>}
                                   </div>
                                   <div className="flex items-center text-xs text-ink-muted">{l.author_name}
                                     <Link href={`/w/${wsId}/logs/new?parent=${l.id}`} className="ml-auto inline-flex items-center gap-1 font-medium text-primary-700 hover:underline pointer-coarse:min-h-11"><Plus className="size-3" /> 이 로그 아래에 추가</Link>
@@ -261,6 +299,12 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                                       <Button variant="outline" size="xs" onClick={() => setStatus(l.id, "active")} disabled={busyId === l.id} title="검색에 다시 포함"><RotateCcw className="size-3" /> 복원</Button>
                                     ) : (
                                       <Button variant="outline" size="xs" onClick={() => setStatus(l.id, "deprecated")} disabled={busyId === l.id} title="검색에서 뺍니다. 내용과 연결은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-3" /> 폐기</Button>
+                                    )}
+                                    {l.type === "fail" && l.root_id !== l.id && l.status === "active" && (
+                                      <Button variant="outline" size="xs" onClick={() => setCause(l, l.category !== "cause")} disabled={busyId === l.id}
+                                        title="이 실패 기록이 장애의 원인이면 표시합니다. 보고서의 원인 칸과 흐름의 원인 배지에 쓰입니다. 원인이 아닌 부수적인 문제에는 표시하지 않습니다">
+                                        <Crosshair className="size-3" /> {l.category === "cause" ? "원인 표시 해제" : "원인으로 표시"}
+                                      </Button>
                                     )}
                                     {l.type === "success" && l.root_id !== l.id && l.status === "active" && (
                                       <Button variant="outline" size="xs" onClick={() => setPrevention(l, l.category !== "prevention")} disabled={busyId === l.id}
@@ -507,7 +551,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
 function SummaryBox({ chain }: { chain: Chain }) {
   const st = chain.summary_status;
   const ai = st === "fresh" || st === "stale" || ((st === "generating" || st === "deprecated") && !!chain.summary_at);
-  const at = chain.summary_at ? new Date(chain.summary_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : null;
+  const at = chain.summary_at ? fmtKst(chain.summary_at, "M. D. HH:mm") : null;
   const note = st === "stale" ? "기록이 바뀌어 새 요약을 만드는 중입니다 — 이전 요약" : st === "none" || (st === "generating" && !ai) ? "AI 요약을 만드는 중이거나, 이 서버에서 AI 요약을 쓰지 않습니다" : null;
   return (
     <div className="mt-5 rounded-xl bg-primary-50 p-4 sm:mt-6 sm:p-5">

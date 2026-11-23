@@ -64,6 +64,8 @@ const codeText: Record<string, string> = {
   LAST_COMPANY_ADMIN: "회사 관리자가 한 명은 있어야 합니다",
   ALREADY_INACTIVE: "이미 비활성화된 계정입니다",
   EMAIL_TAKEN: "다른 계정이 이미 쓰는 이메일입니다",
+  FILE_TOO_LARGE: "30MB를 넘는 파일은 올릴 수 없습니다",
+  VALIDATION: "입력한 내용을 확인해 주세요(빈 칸이 있거나 너무 깁니다)",
   // 규정 문서·업로드 (백엔드 #37·#44)
   SUPERSEDED: "새 판으로 대체된 문서라 복원할 수 없습니다 — 두 판이 함께 검색되기 때문입니다",
   NOT_RETIRED: "폐기한 문서만 삭제할 수 있습니다",
@@ -204,9 +206,10 @@ export async function fetchOrphaned(wsId: number, id: number): Promise<number[]>
 }
 
 // 완료/해제. 성공 로그가 없으면 서버가 409 NOTE_REQUIRED 를 주고, note 를 받아 다시 보낸다
-export async function patchResolved(wsId: number, id: number, resolved: boolean, note?: string): Promise<{ ok: true; node: LogNode } | { ok: false; code?: string; message: string }> {
+// resolvedNodeIds = 이 장애 건을 실제로 해결한 기록(그 장애 건 아래의 활성 성공 기록만, 아니면 400 RESOLVED_NODE_INVALID). 보고서 "조치와 결과"·체인의 해결 배지가 이것을 쓴다(백엔드 #31)
+export async function patchResolved(wsId: number, id: number, resolved: boolean, note?: string, resolvedNodeIds?: number[]): Promise<{ ok: true; node: LogNode } | { ok: false; code?: string; message: string }> {
   try {
-    const { data } = await api.patch<LogNode>(`/logs/${id}`, { resolved, note }, ws(wsId));
+    const { data } = await api.patch<LogNode>(`/logs/${id}`, { resolved, note, ...(resolvedNodeIds ? { resolved_node_ids: resolvedNodeIds } : {}) }, ws(wsId));
     return { ok: true, node: data };
   } catch (e) {
     return fail(e, "완료 처리");
