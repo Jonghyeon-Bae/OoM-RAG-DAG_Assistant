@@ -11,6 +11,7 @@ import type { InactiveUser, InviteResult, Member, MemberRole } from "@/lib/types
 // 멤버: 목록(이메일 마스킹) · 초대(임시 비밀번호 1회 표시) · 잠금 해제 — 현재 워크스페이스 admin 전용 (D-5)
 // 멤버 관리(#104): 역할 변경·부서에서 제외 = 부서 관리자(서버 구현됨), 임시 비밀번호 재발급 = 부서 관리자(REQ-11), 계정 비활성화 = 회사 관리자 — 둘은 FE-REQ-004로 서버 대기
 const roleLabel: Record<MemberRole, string> = { admin: "관리자", member: "멤버" };
+const MULTI_DEPT = "여러 부서에 속한 계정이라 회사 관리자만 할 수 있습니다.";
 
 export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { wsId: number; wsName: string; initial: Member[]; meId: number; companyAdmin: boolean }) {
   const [members, setMembers] = useState(initial);
@@ -93,8 +94,9 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
               ? <Button size="xs" variant="outline" disabled={self || acting} onClick={() => setRole(m, "admin")}>관리자로 지정</Button>
               : <Button size="xs" variant="outline" disabled={self || acting} onClick={() => setRole(m, "member")}>멤버로 변경</Button>}
             <Button size="xs" variant="outline" disabled={self || acting} onClick={() => setConfirm({ id: m.id, kind: "remove", reason: "" })} className="text-warn hover:bg-warn-bg hover:text-warn">부서에서 제외</Button>
-            <Button size="xs" variant="outline" disabled={pending || self || acting} onClick={() => resetPw(m)} title={pending ? "백엔드 API 준비 중(FE-REQ-004)" : "새 임시 비밀번호를 한 번 보여 줍니다. 다음 로그인 때 바꾸게 됩니다"}>임시 비밀번호 재발급</Button>
+            <Button size="xs" variant="outline" disabled={pending || self || acting || m.can_manage_account === false} onClick={() => resetPw(m)} title={pending ? "백엔드 API 준비 중(FE-REQ-004)" : m.can_manage_account === false ? MULTI_DEPT : "새 임시 비밀번호를 한 번 보여 줍니다. 다음 로그인 때 바꾸게 됩니다(그 사람의 로그인은 풀립니다)"}>임시 비밀번호 재발급</Button>
           </div>
+          {!self && m.can_manage_account === false && <p className="text-xs text-ink-muted">{MULTI_DEPT} (비밀번호 재발급·잠금 해제)</p>}
         </div>
         {companyAdmin && (
           <div className="flex flex-col gap-1.5">
@@ -127,7 +129,7 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
 
   const status = (m: Member) =>
     m.locked ? (
-      <Button variant="outline" size="xs" onClick={() => unlock(m)} disabled={unlocking === m.id} title="로그인 연속 실패로 잠긴 계정. 풀면 바로 로그인할 수 있습니다">
+      <Button variant="outline" size="xs" onClick={() => unlock(m)} disabled={unlocking === m.id || m.can_manage_account === false} title={m.can_manage_account === false ? `${MULTI_DEPT} 15분 뒤 저절로 풀립니다` : "로그인 연속 실패로 잠긴 계정. 풀면 바로 로그인할 수 있습니다"}>
         {unlocking === m.id ? <Loader2 className="size-3 animate-spin" /> : <Lock className="size-3" />} 잠금 해제
       </Button>
     ) : <span className="text-xs text-ink-muted">정상</span>;
@@ -225,7 +227,7 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
       {companyAdmin && (
         <Card className="gap-3 p-6">
           <h2 className="flex items-center gap-2 font-bold text-ink"><UserX className="size-4" /> 비활성 계정{inactive && <span className="text-sm font-normal text-ink-muted">{inactive.length}명</span>}</h2>
-          <p className="text-xs text-ink-muted">회사 전체에서 비활성화한 계정입니다(회사 관리자만 보입니다). 다시 활성화하면 이전 소속 부서 그대로 로그인할 수 있습니다.</p>
+          <p className="text-xs text-ink-muted">회사 전체에서 비활성화한 계정입니다(회사 관리자만 보입니다). 다시 활성화하면 이전 소속 부서 그대로 로그인할 수 있습니다. 로그인하면 비밀번호를 새로 정하게 됩니다.</p>
           {!ACCOUNT_API_READY ? <p className="rounded-md bg-primary-50 px-3 py-2 text-xs text-ink-muted">서버 준비 중입니다(FE-REQ-004) — 연결되면 목록이 여기에 나옵니다.</p>
             : inactiveErr ? <p role="alert" className="rounded-md bg-fail-bg px-3 py-2 text-xs text-fail">{inactiveErr}</p>
             : !inactive ? <p className="text-xs text-ink-muted">불러오는 중…</p>

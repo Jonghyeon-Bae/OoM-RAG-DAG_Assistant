@@ -24,6 +24,7 @@ export function PasswordChange({ submitLabel, onDone, autoFocus = false }: { sub
           <p className="font-semibold text-ink">작성 규칙</p>
           <p className="mt-1 whitespace-pre-line">{policy.rule}</p>
           <p className="mt-1">{policy.max_age_days}일마다 변경 · 연속 {policy.lock_after_failures}회 실패 시 {policy.lock_minutes}분 잠금</p>
+          <p className="mt-1">비밀번호를 바꾸면 다른 기기·브라우저에서는 다시 로그인해야 합니다.</p>
         </div>
       )}
       <form className="flex flex-col gap-4" onSubmit={async (e) => {
