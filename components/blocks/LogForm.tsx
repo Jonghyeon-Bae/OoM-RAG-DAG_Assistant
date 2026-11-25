@@ -49,6 +49,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         body: String(fd.get("body") ?? "").trim(),
         parent_id: parent === ROOT ? null : Number(parent),
         resolve_root: resolveRoot,
+        edge_reason: parent !== ROOT ? String(fd.get("edge_reason") ?? "").trim() || undefined : undefined, // 상위에 이어 붙인 이유(선택, 300자 — 백엔드 #31). 흐름 카드의 ↳ 와 보고서 원인 칸의 "연결 이유"에 쓰인다
         problem_title: parent === ROOT && type === "success" ? String(fd.get("problem_title") ?? "").trim() : undefined,
         ...(refs.length ? { policy_refs: refs.map(toInput) } : {}),
       });
@@ -137,6 +138,12 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
       <Field label="내용" htmlFor="log-body">
         <Textarea id="log-body" name="body" maxLength={5000} className="min-h-[7.5rem]" placeholder={guide[type].body} required />
       </Field>
+
+      {parent !== ROOT && (
+        <Field label="왜 이 기록에 이어 붙이나요? (선택)" htmlFor="log-edge-reason">
+          <Input id="log-edge-reason" name="edge_reason" maxLength={300} className="h-11" placeholder={type === "fail" ? "예: 같은 오류가 이 설정을 바꾼 뒤부터 났다" : type === "success" ? "예: 이 원인을 없애는 조치" : "예: 이 조치에 쓴 절차 문서"} />
+        </Field>
+      )}
 
       {type === "success" && parent !== ROOT && (
         <label className="flex items-start gap-3 rounded-lg border border-success-bg bg-success-bg/40 p-3 text-sm">

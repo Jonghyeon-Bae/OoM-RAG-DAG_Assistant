@@ -277,7 +277,8 @@ export interface Me {
 
 // ── 관리자 (UserAdminController · WorkspaceController) ──
 export type MemberRole = "admin" | "member";
-export interface Member { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null; role: MemberRole; locked: boolean }
+// can_manage_account = 요청한 사람이 이 계정을 재발급·잠금 해제할 수 있는가(회사 관리자 모두 true, 부서 관리자는 그 계정이 속한 모든 부서의 admin 일 때만 — 백엔드 #55)
+export interface Member { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null; role: MemberRole; locked: boolean; can_manage_account?: boolean }
 // GET /audit — 접속 기록(회사 관리자, 자기 회사만). category: auth 로그인·비밀번호 / member 멤버 관리 / settings 부서 설정. IP 는 서버가 가려서 준다
 export interface AuditItem { id: number; at: string; category: "auth" | "member" | "settings"; action: string; employee_no: string | null; actor: string | null; ip_masked: string | null; reason: string | null }
 // GET /users/inactive — 같은 회사의 비활성 계정(회사 관리자). 멤버 목록에서는 빠지므로 재활성화는 이 목록에서 한다
