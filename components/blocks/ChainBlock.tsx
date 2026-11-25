@@ -4,6 +4,7 @@ import { ArrowDown, ArrowRight, CornerDownRight } from "lucide-react";
 import type { Chain, ChainNode, NodePolicyRef, PolicyRelation } from "@/lib/types/domain";
 import { cn, typeLabel } from "@/components/ui";
 import { relationLabel } from "@/lib/relation";
+import { PolicyArticleDialog } from "@/components/blocks/PolicyArticleDialog";
 
 // B-17 / B-45: 깊이별 열(root → 원인 → 해결)로 배치한 체인 블록. 타임라인 그래프(ChainGraph)와 어시스턴트 답변 카드 공용.
 // FE-012 P1-7·8: 원인/해결 표시, 근거 조문(따름·예외·기준 없음), 이 상위에 이어 붙인 이유
@@ -24,14 +25,26 @@ const relationTone: Record<PolicyRelation, string> = {
 // 조문 표기: "환불 규정 제7조" — RefView(REST)는 doc_title+article_label, SSE 는 label 하나만 온다
 const refText = (p: NodePolicyRef) => [p.doc_title, p.article_label].filter(Boolean).join(" ") || p.topic || "";
 
-function PolicyLine({ p }: { p: NodePolicyRef }) {
-  const text = refText(p);
+// 원문(article_text)이 있거나 다시 연결이 필요한(replaced) 근거는 누르면 조문 창이 뜬다. 어시스턴트 답변 카드(SSE 축약형)는 원문이 없어 글만 보인다
+function PolicyLine({ p, nodeId, refs, index }: { p: NodePolicyRef; nodeId: number; refs: NodePolicyRef[]; index: number }) {
+  const [open, setOpen] = useState(false);
+  const text = refText(p) || (p.revision === "replaced" ? p.from_label ?? "" : "");
+  const openable = !!p.article_text || p.revision === "replaced";
   const title = [relationLabel[p.relation], text, p.note, p.revision && `개정: ${p.from_label ?? "이전"} → ${p.revision}`].filter(Boolean).join(" · ");
-  return (
-    <li className="flex min-w-0 items-center gap-1.5 text-xs" title={title}>
+  const inner = (
+    <>
       <span className={cn("shrink-0 rounded px-1.5 py-0.5 font-semibold", relationTone[p.relation])}>{relationLabel[p.relation]}</span>
-      {text && <span className="truncate text-ink-muted">{text}</span>}
-      {p.revision && <span className="shrink-0 rounded bg-warn-bg px-1 text-warn">개정</span>}
+      {text && <span className={cn("truncate text-ink-muted", openable && "underline decoration-dotted underline-offset-2")}>{text}</span>}
+      {p.revision === "replaced" ? <span className="shrink-0 rounded bg-warn px-1 text-white">다시 연결 필요</span> : p.revision && <span className="shrink-0 rounded bg-warn-bg px-1 text-warn">개정</span>}
+    </>
+  );
+  if (!openable) return <li className="flex min-w-0 items-center gap-1.5 text-xs" title={title}>{inner}</li>;
+  // 카드 전체가 "고르기" 버튼인 화면(타임라인)에서도 조문만 따로 열리게 이벤트를 여기서 멈춘다
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <li className="min-w-0 text-xs" onClick={stop} onKeyDown={stop}>
+      <button type="button" onClick={() => setOpen(true)} title={`${title} — 눌러서 조문 보기`} className="flex w-full min-w-0 items-center gap-1.5 rounded text-left hover:bg-primary-50">{inner}</button>
+      {open && <PolicyArticleDialog nodeId={nodeId} refs={refs} index={index} open onClose={() => setOpen(false)} />}
     </li>
   );
 }
@@ -68,7 +81,7 @@ export function ChainNodeCard({ node, compact = false, selected = false, reasons
       )}
       {shown.length > 0 && (
         <ul className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
-          {shown.map((p, i) => <PolicyLine key={i} p={p} />)}
+          {shown.map((p, i) => <PolicyLine key={i} p={p} nodeId={node.id} refs={refs} index={i} />)}
           {refs.length > shown.length && <li className="text-xs text-ink-muted">근거 조문 {refs.length - shown.length}건 더</li>}
         </ul>
       )}

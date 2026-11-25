@@ -5,7 +5,7 @@ import { ArrowLeft, Copy, Eye, Loader2, Printer, RefreshCw, X } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Chip, cn } from "@/components/ui";
 import { createReport, fetchReports } from "@/lib/api/client";
-import { aiEmpty, aiStateOf, groupPolicy, EMPTY, fmtDateTime, fmtDuration, fmtShort, kindLabel, relationText, reportMarkdown, type AiState } from "@/lib/report/format";
+import { aiEmpty, aiStateOf, groupPolicy, EMPTY, fmtDateTime, fmtDuration, fmtShort, kindLabel, relationText, reportMarkdown, resolutionEmpty, type AiState } from "@/lib/report/format";
 import type { Report, ReportAudience, ReportKind, ReportSentence } from "@/lib/types/report";
 
 // 장애 보고서 R1 화면 (FE-REQ-005 확정 템플릿). 섹션 순서·제목은 고정이고 비어도 지우지 않는다.
@@ -234,7 +234,7 @@ export function ReportView({ wsId, rootId, canExternal }: { wsId: number; rootId
             <Table head={["기록", "조치", "결과"]}>
               {c.resolution.items.map((x) => <tr key={x.ref}><td className="font-mono text-xs">{x.ref}</td><td>{x.title}</td><td className="text-ink-muted">{x.summary ?? "-"}</td></tr>)}
             </Table>
-          ) : <Empty>{c.meta.status === "resolved" ? EMPTY.resolutionUnmarked : EMPTY.resolution}</Empty>}
+          ) : <Empty>{resolutionEmpty(c)}</Empty>}
           {c.resolution.resolve_note && <p className="mt-2"><b>완료 사유</b> {c.resolution.resolve_note}</p>}
           {c.resolution.others.length > 0 && <p className="mt-2 text-ink-muted"><b className="text-ink">그 밖의 조치·참고</b> {c.resolution.others.map((o) => `${o.ref} ${o.title}`).join(" · ")}</p>}
           {c.resolution.note && <p className="mt-2"><Sentences s={[c.resolution.note]} inline to={to} /></p>}

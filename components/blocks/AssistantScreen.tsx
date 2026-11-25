@@ -107,7 +107,7 @@ const stageLabel: { node: StageNode; label: string; hint: string }[] = [
 ];
 const intentLabel: Record<Intent, string> = { policy: "규정 확인", troubleshoot: "장애 해결", both: "규정 + 해결 사례" };
 // 실서버 stage detail 코드 → 표시 문구 (근거 없음은 gate 의 detail "no_evidence")
-const detailLabel: Record<string, string> = { no_evidence: "근거 없음", no_relevant_case: "관련 사례 없음" };
+const detailLabel: Record<string, string> = { no_evidence: "근거 없음", no_relevant_case: "관련 사례 없음", linked: "사례에 연결된 규정부터 찾는 중", fallback: "연결된 규정이 없어 전체 규정에서 찾는 중" };
 // 추천 질문은 서버 workspace.suggestions(부서별). 고정 문구는 그 부서에 근거가 없는 질문을 띄운다 (FE-012 P0-2)
 // 모드별 안내·입력 힌트 (lib/mode 의 모드 3종)
 const modeIntro: Record<WsMode, string> = {
@@ -480,7 +480,8 @@ function AnswerCard({ turn, collapsed, highlighted, activeRef, onOpen, onCite, o
       if (line.startsWith("## ")) return <h3 key={i} className="mb-1 mt-3 text-sm font-bold text-primary-700 first:mt-0">{line.slice(3)}</h3>;
       if (!line.trim()) return null;
       return (
-        <p key={i} className="text-sm leading-relaxed text-ink">
+        // 서버가 답변 끝에 붙이는 "※ …도 함께 확인해야 합니다" 안내 줄은 본문보다 흐리게(백엔드 회신 11/24 §7.1)
+        <p key={i} className={cn("text-sm leading-relaxed", line.startsWith("※ ") ? "mt-2 text-xs text-ink-muted" : "text-ink")}>
           {splitMarks(line).map((seg, j, segs) => {
             const m = /^\[([PN]\d+)\]$/.exec(seg);
             if (!m) return <span key={j} className={cn(citesRef(segs, j, activeRef) && "rounded bg-primary-200 box-decoration-clone px-1 py-0.5")}>{seg}</span>; // 바로 뒤 번호가 고른 근거면 이 문장에 배경

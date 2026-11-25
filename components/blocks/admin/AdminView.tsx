@@ -9,7 +9,7 @@ import type { ManageableWorkspace, Member } from "@/lib/types/domain";
 // 관리자 (D-5, FE-013 §3.6). 탭은 권한이 있는 것만 보인다: 멤버 = 이 ws 의 admin, 부서 설정 = can_configure(회사 관리자 포함)
 // 접속 기록 = 회사 관리자(GET /audit, #121). 규정 문서 관리는 문서 메뉴(/documents)에서 한다
 type Tab = "members" | "settings" | "audit";
-export function AdminView({ wsId, wsName, members, manageable, meId, companyAdmin }: { wsId: number; wsName: string; members: Member[] | null; manageable: ManageableWorkspace[]; meId: number; companyAdmin: boolean }) {
+export function AdminView({ wsId, wsName, members, manageable, meId, companyAdmin, memberWsIds }: { wsId: number; wsName: string; members: Member[] | null; manageable: ManageableWorkspace[]; meId: number; companyAdmin: boolean; memberWsIds: number[] }) {
   const tabs: { id: Tab; label: string }[] = [
     ...(members ? [{ id: "members" as const, label: "멤버" }] : []),
     ...(manageable.length ? [{ id: "settings" as const, label: "부서 설정" }] : []),
@@ -25,7 +25,7 @@ export function AdminView({ wsId, wsName, members, manageable, meId, companyAdmi
         ))}
       </div>
       {tab === "members" && members && <MembersPanel wsId={wsId} wsName={wsName} initial={members} meId={meId} companyAdmin={companyAdmin} />}
-      {tab === "settings" && manageable.length > 0 && <DeptSettingsPanel initial={manageable} />}
+      {tab === "settings" && manageable.length > 0 && <DeptSettingsPanel initial={manageable} memberWsIds={memberWsIds} companyAdmin={companyAdmin} />}
       {tab === "audit" && companyAdmin && <AuditPanel />}
     </main>
   );
