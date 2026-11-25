@@ -1,24 +1,29 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText, ShieldCheck, Crosshair } from "lucide-react";
+import { Search, ChevronDown, Check, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText, ShieldCheck, Crosshair } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Chip, TypeBadge, cn } from "@/components/ui";
+import { Chip, typeLabel, cn } from "@/components/ui";
 import { ChainGraph } from "@/components/blocks/ChainGraph";
 import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
 import { fmtKst } from "@/lib/datetime";
 import { fetchChain, fetchLog, fetchOrphaned, patchCategory, patchResolved, patchStatus, postRefine } from "@/lib/api/client";
 import type { Chain, LogNode, LogType } from "@/lib/types/domain";
 
-const typeFilters: { key: LogType | "all"; label: string; cls: string }[] = [
-  { key: "all", label: "전체", cls: "bg-ref-bg text-ref" },
-  { key: "fail", label: "실패", cls: "bg-fail-bg text-fail" },
-  { key: "success", label: "성공", cls: "bg-success-bg text-success" },
-  { key: "ref", label: "참고", cls: "bg-ref-bg text-ref" },
+const typeFilters: { key: LogType | "all"; label: string; dot?: string }[] = [
+  { key: "all", label: "전체" },
+  { key: "fail", label: "실패", dot: "bg-fail" },
+  { key: "success", label: "성공", dot: "bg-success" },
+  { key: "ref", label: "참고", dot: "bg-ref" },
 ];
 const dotTone: Record<LogType, string> = { fail: "bg-fail", success: "bg-success", ref: "bg-ref" };
+const textTone: Record<LogType, string> = { fail: "text-fail", success: "text-success", ref: "text-ref" };
+// 유형 표시: 색 바탕 배지 대신 색 글자(점 + 이름) — 목록에 색 면이 겹쳐 보이지 않게
+function TypeText({ type, className }: { type: LogType; className?: string }) {
+  return <span className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-semibold", textTone[type], className)}><span className="size-1.5 rounded-full bg-current" />{typeLabel[type]}</span>;
+}
 const PAGE = 8;
 
 const fmt = (iso: string) => fmtKst(iso, "MM.DD HH:mm");
@@ -281,9 +286,9 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
 <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
                                   {l.resolution_summary && <p className="text-sm font-medium text-ink">{l.resolution_summary}</p>}
                                   <div className="flex flex-wrap gap-1.5">
-                                    {l.error_code && <Chip tone="fail">{l.error_code}</Chip>}
+                                    {l.error_code && <Chip tone="neutral">{l.error_code}</Chip>}
                                     {l.keywords.map((k) => <Chip key={k}>#{k}</Chip>)}
-                                    {l.refine_status === "done" ? <Chip tone="primary">검색 가능</Chip> : <Chip tone="warn">{l.refine_status === "failed" ? "정리 실패" : "정리 중"}</Chip>}
+                                    {l.refine_status === "done" ? <span className="inline-flex h-7 items-center gap-1 text-xs font-medium text-primary-700"><Check className="size-3" />검색 가능</span> : <Chip tone="warn">{l.refine_status === "failed" ? "정리 실패" : "정리 중"}</Chip>}
                                     {l.status === "deprecated" && <Chip tone="warn" title={l.deprecate_reason ? `사유: ${l.deprecate_reason}` : undefined}>폐기{l.deprecate_reason && ` · ${l.deprecate_reason}`}</Chip>}
                                     {l.category === "prevention" && <Chip tone="dark" title="장애 보고서의 재발 방지·후속 조치 칸에 실리는 기록">재발 방지</Chip>}
                                     {l.category === "cause" && l.root_id !== l.id && <Chip tone="fail" title="장애 건의 원인으로 표시한 기록">원인</Chip>}
@@ -361,7 +366,8 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
         </div>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           {typeFilters.map((f) => (
-            <button key={f.key} type="button" onClick={() => setType(f.key)} className={cn("flex h-8 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold transition-colors pointer-coarse:h-11 pointer-coarse:px-4", f.key === type ? "bg-primary-700 text-white" : f.cls)}>
+            <button key={f.key} type="button" onClick={() => setType(f.key)} className={cn("flex h-8 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition-colors pointer-coarse:h-11 pointer-coarse:px-4", f.key === type ? "border-primary-700 bg-primary-700 text-white" : "border-border bg-card text-ink hover:bg-primary-50")}>
+              {f.dot && <span className={cn("size-1.5 rounded-full", f.key === type ? "bg-white" : f.dot)} />}
               {f.label} {counts[f.key]}
             </button>
           ))}
@@ -400,9 +406,9 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       <div className={cn("text-[0.9375rem] font-bold leading-snug text-ink", g.resolved && "line-through opacity-70")}>{g.root.title}</div>
                     </button>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
-                      <TypeBadge type={g.root.type} />
-                      {g.root.error_code && <Chip tone="fail" className="h-5 text-xs">{g.root.error_code}</Chip>}
-                      {g.root.type === "ref" ? <Chip tone="neutral" className="h-5 text-xs" title="절차·자료 기록. 완료 처리 대상이 아닙니다">자료</Chip> : g.resolved ? <Chip tone="primary" className="h-5 text-xs" title={g.root.resolve_note ? `완료 사유: ${g.root.resolve_note}` : "이어진 해결 로그로 완료"}>완료{g.root.resolve_note && " · 사유 있음"}</Chip> : <Chip tone="warn" className="h-5 text-xs">진행 중</Chip>}
+                      <TypeText type={g.root.type} />
+                      {g.root.error_code && <Chip tone="neutral" className="h-5 text-xs">{g.root.error_code}</Chip>}
+                      {g.root.type === "ref" ? <Chip tone="neutral" className="h-5 text-xs" title="절차·자료 기록. 완료 처리 대상이 아닙니다">자료</Chip> : g.resolved ? <Chip tone="neutral" className="h-5 text-xs" title={g.root.resolve_note ? `완료 사유: ${g.root.resolve_note}` : "이어진 해결 로그로 완료"}>완료{g.root.resolve_note && " · 사유 있음"}</Chip> : <Chip tone="warn" className="h-5 text-xs">진행 중</Chip>}
                       <span>기록 {g.total}건</span>
                       <span>·</span>
                       <span>최근 {fmt(g.last)}</span>
@@ -420,7 +426,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                     {g.root.type === "ref" ? null : g.resolved ? (
                       <Button variant="outline" size="xs" onClick={() => resolve(g.root, false)} title="완료 해제"><Undo2 className="size-3" /> 완료 해제</Button>
                     ) : (
-                      <Button variant="outline" size="xs" onClick={() => resolve(g.root, true)} title={g.hasSuccess ? "이 장애 건을 완료 처리" : "해결 로그가 없어 완료 사유를 묻습니다"} className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
+                      <Button variant="outline" size="xs" onClick={() => resolve(g.root, true)} title={g.hasSuccess ? "이 장애 건을 완료 처리" : "해결 로그가 없어 완료 사유를 묻습니다"}><CheckCircle2 className="size-3" /> 완료 처리</Button>
                     )}
                     <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><Plus className="size-3" /> 로그 추가</Link>
                     {g.root.type !== "ref" && <Link href={`/w/${wsId}/reports/${g.root.id}`} title="이 장애 건의 보고서(템플릿 R1)" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><FileText className="size-3" /> 보고서</Link>}
@@ -451,7 +457,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                             <div className={cn("rounded-lg border border-transparent px-2.5 py-2.5 transition-colors sm:px-3 hover:bg-primary-50", selected && "border-primary-400 bg-primary-50")}>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex min-w-0 items-start gap-2">
-                                  <TypeBadge type={l.type} />
+                                  <TypeText type={l.type} className="mt-0.5" />
                                   {l.category === "prevention" && <span className="mt-0.5 shrink-0 rounded-full bg-ink px-1.5 text-xs text-white" title="재발 방지·후속 조치로 표시한 기록">재발 방지</span>}
                                   <button type="button" onClick={(e) => { e.stopPropagation(); select(l.id); openFlow(); }} className={cn("min-w-0 line-clamp-2 text-left text-sm font-semibold leading-snug text-ink", l.status === "deprecated" && "line-through opacity-60")}>{l.title}</button>
                                 </div>
@@ -495,7 +501,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
           </div>
           <div className="flex gap-2">
             {(["fail", "success", "ref"] as LogType[]).map((t) => (
-              <TypeBadge key={t} type={t} />
+              <TypeText key={t} type={t} />
             ))}
           </div>
         </div>
@@ -510,7 +516,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
             <section className="mb-4 rounded-xl border border-border p-3">
               <div className="mb-1 text-xs font-semibold text-ink-muted">고른 기록</div>
               <div className="flex items-start gap-2">
-                <TypeBadge type={entry.type} />
+                <TypeText type={entry.type} className="mt-0.5" />
                 <div className={cn("min-w-0 text-sm font-semibold leading-snug text-ink", entry.status === "deprecated" && "line-through opacity-60")}>{entry.title}</div>
               </div>
               <p className="mt-1 text-xs text-ink-muted">{entry.author_name} · {fmt(entry.created_at)}</p>
@@ -522,7 +528,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                     {entry.type === "ref" ? null : entry.resolved_at ? (
                       <Button variant="outline" size="xs" onClick={() => resolve(entry, false)}><Undo2 className="size-3" /> 완료 해제</Button>
                     ) : (
-                      <Button variant="outline" size="xs" onClick={() => resolve(entry, true)} className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
+                      <Button variant="outline" size="xs" onClick={() => resolve(entry, true)}><CheckCircle2 className="size-3" /> 완료 처리</Button>
                     )}
                     <Link href={`/w/${wsId}/logs/new?parent=${entry.id}`} className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><Plus className="size-3" /> 로그 추가</Link>
                     {entry.type !== "ref" && <Link href={`/w/${wsId}/reports/${entry.id}`} className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><FileText className="size-3" /> 보고서</Link>}
