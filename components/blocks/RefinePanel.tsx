@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, RefreshCw, Archive, RotateCcw, ExternalLink } from "lucide-react";
+import { Check, Loader2, RefreshCw, Archive, RotateCcw, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Chip, TypeBadge, cn } from "@/components/ui";
+import { Chip, TypeBadge, typeLabel, cn } from "@/components/ui";
 import { fetchLog, fetchRecentLogs, patchStatus, postRefine } from "@/lib/api/client";
 import type { LogNode, RefineStatus } from "@/lib/types/domain";
 
@@ -17,17 +17,17 @@ const order: Record<RefineStatus, number> = { pending: 0, processing: 1, done: 2
 
 function Stepper({ status }: { status: RefineStatus }) {
   return (
-    <ol className="flex items-center gap-2 text-xs">
+    <ol className="flex w-full items-center gap-1.5 text-xs sm:w-auto sm:gap-2">
       {stages.map((s, i) => {
         const reached = order[status] >= i;
         const current = order[status] === i && status !== "done";
         return (
-          <li key={s.key} className="flex items-center gap-2">
-            <span className={cn("flex h-7 items-center gap-1.5 rounded-full px-3 font-medium", reached ? "bg-primary-700 text-white" : "bg-ref-bg text-ref", status === "failed" && i === 2 && "bg-fail text-white")}>
+          <li key={s.key} className={cn("flex items-center gap-1.5 sm:gap-2", i < stages.length - 1 && "flex-auto sm:flex-none")}>
+            <span className={cn("flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 font-medium sm:px-3", reached ? "bg-primary-700 text-white" : "bg-ref-bg text-ref", status === "failed" && i === 2 && "bg-fail text-white")}>
               {current && <Loader2 className="size-3 animate-spin" />}
               {status === "failed" && i === 2 ? "실패" : s.label}
             </span>
-            {i < stages.length - 1 && <span className={cn("h-px w-6", reached ? "bg-primary-400" : "bg-border")} />}
+            {i < stages.length - 1 && <span className={cn("h-px min-w-2 flex-1 sm:w-6 sm:flex-none", reached ? "bg-primary-400" : "bg-border")} />}
           </li>
         );
       })}
@@ -113,14 +113,13 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
   return (
     <div className="flex min-w-0 flex-col gap-6">
       {/* 현재 등록 건의 정제 진행 */}
-      <Card className="p-6">
-        <div className="mb-4 flex items-center gap-3">
+      <Card className="p-4 sm:p-6">        <div className="mb-4 flex items-center gap-3">
           <Chip tone="dark">AI 정리</Chip>
           <span className="text-sm text-ink-muted">등록한 메모에서 에러 코드·키워드·요약을 뽑아 검색되게 만듭니다</span>
         </div>
         {current ? (
           <>
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-2">
                 <TypeBadge type={current.type} />
                 <span className="truncate font-semibold text-ink">{current.title}</span>
@@ -130,12 +129,12 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
             <Result n={current} />
             {notice && <p role="status" className="mt-3 rounded-md bg-warn-bg px-3 py-2 text-xs text-warn">{notice}</p>}
             {current.refine_status === "done" && (
-              <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-                <Link href={`/w/${wsId}/timeline?entry=${current.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-700 px-3 text-sm font-semibold text-white hover:bg-primary-800">
+              <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+                <Link href={`/w/${wsId}/timeline?entry=${current.id}`} className="inline-flex h-9 w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary-700 px-3 text-sm font-semibold text-white hover:bg-primary-800 sm:w-auto">
                   <ExternalLink className="size-4" /> 타임라인에서 보기
                 </Link>
-                <Button variant="outline" size="lg" onClick={() => refine(current.id)} disabled={busyId === current.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다"><RefreshCw className="size-4" /> 다시 정리</Button>
-                <Button variant="outline" size="lg" onClick={() => setAsk({ id: current.id, reason: "" })} disabled={busyId === current.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-4" /> 폐기</Button>
+                <Button variant="outline" size="lg" onClick={() => refine(current.id)} disabled={busyId === current.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다" className="flex-1 sm:flex-none"><RefreshCw className="size-4" /> 다시 정리</Button>
+                <Button variant="outline" size="lg" onClick={() => setAsk({ id: current.id, reason: "" })} disabled={busyId === current.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="flex-1 text-warn hover:bg-warn-bg hover:text-warn sm:flex-none"><Archive className="size-4" /> 폐기</Button>
               </div>
             )}
             {current.refine_status === "done" && reasonBox(current.id)}
@@ -148,33 +147,35 @@ export function RefinePanel({ wsId, currentId, initialRecent }: { wsId: number; 
       </Card>
 
       {/* 최근 정제 결과 타임라인 */}
-      <Card className="p-6">
-        <h3 className="mb-4 font-semibold text-ink">최근 등록한 로그</h3>
+      <Card className="p-4 sm:p-6">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h3 className="font-semibold text-ink">최근 등록한 로그</h3>
+          <span className="text-xs text-ink-muted">제목을 누르면 타임라인에서 열립니다</span>
+        </div>
         <ol className="relative ml-2 border-l border-border pl-5">
           {recent.map((n) => (
             <li key={n.id} className="relative mb-4 last:mb-0">
-              <span className={cn("absolute -left-[1.625rem] top-2 size-2.5 rounded-full ring-4 ring-card", n.type === "fail" ? "bg-fail" : n.type === "success" ? "bg-success" : "bg-ref")} />
+              <span role="img" aria-label={typeLabel[n.type]} title={typeLabel[n.type]} className={cn("absolute -left-[1.625rem] top-1.5 size-2.5 rounded-full ring-4 ring-card", n.type === "fail" ? "bg-fail" : n.type === "success" ? "bg-success" : "bg-ref")} />
               <div className={cn("flex flex-col gap-1.5", n.status === "deprecated" && "opacity-60")}>
                 <div className="flex items-center gap-2">
-                  <TypeBadge type={n.type} />
                   <Link href={`/w/${wsId}/timeline?entry=${n.id}`} className={cn("truncate text-sm font-semibold text-ink hover:underline", n.status === "deprecated" && "line-through")}>{n.title}</Link>
                   <span className="ml-auto shrink-0 text-xs text-ink-muted">{n.author_name}</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                  {n.refine_status === "done" ? <Chip tone="primary">검색 가능</Chip> : n.refine_status === "failed" ? <Chip tone="fail">정리 실패</Chip> : <Chip tone="warn">{n.refine_status === "processing" ? "정리 중" : "대기"}</Chip>}
-                  {n.status === "deprecated" && <Chip tone="warn">폐기</Chip>}
-                  {n.error_code && <Chip tone="fail">{n.error_code}</Chip>}
-                  {n.keywords.slice(0, 3).map((k) => <Chip key={k}>#{k}</Chip>)}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs text-ink-muted">
+                  {n.refine_status === "done" ? <span className="inline-flex items-center gap-1 font-medium text-primary-700"><Check className="size-3" />검색 가능</span> : n.refine_status === "failed" ? <span className="font-medium text-fail">정리 실패</span> : <span className="font-medium text-warn">{n.refine_status === "processing" ? "정리 중" : "대기"}</span>}
+                  {n.status === "deprecated" && <span className="font-medium text-warn">폐기</span>}
+                  {n.error_code && <span>{n.error_code}</span>}
+                  {n.keywords.slice(0, 3).map((k) => <span key={k}>#{k}</span>)}
                   <span className="ml-auto flex gap-1.5">
-                    <Button variant="outline" size="xs" onClick={() => refine(n.id)} disabled={busyId === n.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다">
+                    <Button variant="ghost" size="xs" onClick={() => refine(n.id)} disabled={busyId === n.id} title="적은 내용은 그대로 두고 AI 정리만 다시 합니다" className="bg-primary-50 text-ink-muted hover:bg-primary-100">
                       <RefreshCw className="size-3" /> 다시 정리
                     </Button>
                     {n.status === "deprecated" ? (
-                      <Button variant="outline" size="xs" onClick={() => restore(n.id)} disabled={busyId === n.id} title="검색에 다시 넣습니다">
+                      <Button variant="ghost" size="xs" onClick={() => restore(n.id)} disabled={busyId === n.id} title="검색에 다시 넣습니다" className="bg-primary-50 text-ink-muted hover:bg-primary-100">
                         <RotateCcw className="size-3" /> 복원
                       </Button>
                     ) : (
-                      <Button variant="outline" size="xs" onClick={() => setAsk({ id: n.id, reason: "" })} disabled={busyId === n.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="text-warn hover:bg-warn-bg hover:text-warn">
+                      <Button variant="ghost" size="xs" onClick={() => setAsk({ id: n.id, reason: "" })} disabled={busyId === n.id} title="검색에서 뺍니다. 내용은 남고 되돌릴 수 있습니다" className="bg-primary-50 text-warn hover:bg-warn-bg hover:text-warn">
                         <Archive className="size-3" /> 폐기
                       </Button>
                     )}
