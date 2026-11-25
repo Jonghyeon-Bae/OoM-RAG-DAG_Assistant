@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, Check, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText, ShieldCheck, Crosshair } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
+import { Search, ChevronDown, Check, CheckCircle2, Undo2, Plus, RefreshCw, Archive, RotateCcw, GitBranch, FileText, ShieldCheck, Crosshair, Ellipsis } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,11 @@ const textTone: Record<LogType, string> = { fail: "text-fail", success: "text-su
 function TypeText({ type, className }: { type: LogType; className?: string }) {
   return <span className={cn("inline-flex shrink-0 items-center gap-1 text-xs font-semibold", textTone[type], className)}><span className="size-1.5 rounded-full bg-current" />{typeLabel[type]}</span>;
 }
+// 장애 건 머리줄의 버튼: 주 버튼 하나만 남색(PC), 나머지는 흰 버튼, 덜 쓰는 동작은 ⋯ 메뉴 안으로.
+// 휴대폰에서는 "해결 흐름 보기"가 남색 주 버튼(윗줄 전체)이고, 여기 버튼들은 흰색으로 아랫줄을 나눠 쓴다
+const plainBtn = "inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-card px-2.5 text-xs font-medium text-ink hover:bg-primary-100 max-sm:flex-1 max-sm:justify-center max-sm:px-1.5 max-sm:[&_svg]:hidden pointer-coarse:min-h-11";
+const mainBtn = cn(plainBtn, "font-semibold lg:border-primary-700 lg:bg-primary-700 lg:text-white lg:hover:bg-primary-800");
+const menuItem = "flex cursor-default items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-ink outline-none data-[highlighted]:bg-primary-50 data-[disabled]:opacity-50 pointer-coarse:min-h-11";
 const PAGE = 8;
 
 const fmt = (iso: string) => fmtKst(iso, "MM.DD HH:mm");
@@ -422,29 +428,40 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                       </div>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5 @max-md:w-full @max-md:flex-row @max-md:flex-wrap @max-md:items-center @max-md:justify-end">{/* 카드 폭 기준(좁은 왼쪽 칸·휴대폰): 동작 버튼을 제목 아래 한 줄로 */}
-                    {g.root.type === "ref" ? null : g.resolved ? (
-                      <Button variant="outline" size="xs" onClick={() => resolve(g.root, false)} title="완료 해제"><Undo2 className="size-3" /> 완료 해제</Button>
+                  <div className="flex w-full flex-wrap items-center gap-1.5 sm:pl-7">{/* 제목 아래 한 줄: 주 버튼 → 옆 버튼 → 더 보기 */}
+                    {g.resolved ? (
+                      <>
+                        <Link href={`/w/${wsId}/reports/${g.root.id}`} title="이 장애 건의 보고서(템플릿 R1)" className={mainBtn}><FileText className="size-3" /> 보고서</Link>
+                        <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className={plainBtn}><Plus className="size-3" /> 로그 추가</Link>
+                      </>
                     ) : (
-                      <Button variant="outline" size="xs" onClick={() => resolve(g.root, true)} title={g.hasSuccess ? "이 장애 건을 완료 처리" : "해결 로그가 없어 완료 사유를 묻습니다"}><CheckCircle2 className="size-3" /> 완료 처리</Button>
+                      <>
+                        <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className={mainBtn}><Plus className="size-3" /> 로그 추가</Link>
+                        {g.root.type !== "ref" && <button type="button" onClick={() => resolve(g.root, true)} title={g.hasSuccess ? "이 장애 건을 완료 처리" : "해결 로그가 없어 완료 사유를 묻습니다"} className={plainBtn}><CheckCircle2 className="size-3" /> 완료 처리</button>}
+                        {g.root.type !== "ref" && <Link href={`/w/${wsId}/reports/${g.root.id}`} title="이 장애 건의 보고서(템플릿 R1)" className={plainBtn}><FileText className="size-3" /> 보고서</Link>}
+                      </>
                     )}
-                    <Link href={`/w/${wsId}/logs/new?parent=${g.root.id}`} title="이 장애 건에 로그 추가" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><Plus className="size-3" /> 로그 추가</Link>
-                    {g.root.type !== "ref" && <Link href={`/w/${wsId}/reports/${g.root.id}`} title="이 장애 건의 보고서(템플릿 R1)" className="inline-flex h-6 items-center gap-1 rounded-md border border-border px-2 text-xs font-medium text-ink hover:bg-primary-100 pointer-coarse:min-h-11"><FileText className="size-3" /> 보고서</Link>}
-                    <Button size="xs" className="lg:hidden" onClick={() => { select(g.root.id); setSheetOpen(true); }}><GitBranch className="size-3" /> 해결 흐름 보기</Button>
-                    {g.root.id === entryId && (
-                      <div className="flex gap-1.5 max-lg:hidden">
-                        <Button variant="outline" size="xs" onClick={() => refine(g.root.id)} disabled={busyId === g.root.id} title="이 기록의 AI 정리만 다시 합니다. 관련 로그 무관"><RefreshCw className={cn("size-3", (g.root.refine_status === "pending" || g.root.refine_status === "processing") && "animate-spin")} /> 다시 정리</Button>
-                        {g.root.status === "deprecated" ? (
-                          <Button variant="outline" size="xs" onClick={() => setStatus(g.root.id, "active")} disabled={busyId === g.root.id}><RotateCcw className="size-3" /> 복원</Button>
-                        ) : (
-                          <Button variant="outline" size="xs" onClick={() => setStatus(g.root.id, "deprecated")} disabled={busyId === g.root.id} title="검색에서 뺍니다. 범위(이 로그만 / 이어진 로그 포함)는 다음에 고릅니다" className="text-warn hover:bg-warn-bg hover:text-warn"><Archive className="size-3" /> 폐기</Button>
-                        )}
-                      </div>
-                    )}
+                    <Button size="sm" className="order-first w-full sm:order-none sm:w-auto lg:hidden" onClick={() => { select(g.root.id); setSheetOpen(true); }}><GitBranch className="size-3" /> 해결 흐름 보기</Button>
+                    <Menu.Root>
+                      <Menu.Trigger aria-label="더 보기" title="다시 정리 · 폐기 등" className="ml-auto inline-flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-card px-2 text-xs font-medium text-ink-muted hover:bg-primary-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center"><Ellipsis className="size-4" /><span className="max-sm:hidden">더 보기</span></Menu.Trigger>
+                      <Menu.Portal>
+                        <Menu.Positioner align="end" sideOffset={4} className="z-50">
+                          <Menu.Popup className="min-w-40 rounded-lg border border-border bg-card p-1 shadow-lg outline-none">
+                            {g.root.type !== "ref" && g.resolved && <Menu.Item className={menuItem} onClick={() => resolve(g.root, false)}><Undo2 className="size-3.5" /> 완료 해제</Menu.Item>}
+                            <Menu.Item className={menuItem} disabled={busyId === g.root.id} onClick={() => refine(g.root.id)} title="이 기록의 AI 정리만 다시 합니다. 관련 로그 무관"><RefreshCw className={cn("size-3.5", (g.root.refine_status === "pending" || g.root.refine_status === "processing") && "animate-spin")} /> 다시 정리</Menu.Item>
+                            {g.root.status === "deprecated" ? (
+                              <Menu.Item className={menuItem} disabled={busyId === g.root.id} onClick={() => setStatus(g.root.id, "active")}><RotateCcw className="size-3.5" /> 복원</Menu.Item>
+                            ) : (
+                              <Menu.Item className={cn(menuItem, "text-warn")} disabled={busyId === g.root.id} onClick={() => setStatus(g.root.id, "deprecated")} title="검색에서 뺍니다. 범위(이 로그만 / 이어진 로그 포함)는 다음에 고릅니다"><Archive className="size-3.5" /> 폐기</Menu.Item>
+                            )}
+                          </Menu.Popup>
+                        </Menu.Positioner>
+                      </Menu.Portal>
+                    </Menu.Root>
                   </div>
                 </div>
                 {note?.id === g.root.id && !sheetOpen && <div className="px-3 pb-3 sm:px-4">{NoteBox({ root: g.root })}</div>}
-                {g.root.id === entryId && ask?.id === g.root.id && !sheetOpen && <div className="px-3 pb-3 sm:px-4 max-lg:hidden">{AskBox({ id: g.root.id })}</div>}
+                {ask?.id === g.root.id && !sheetOpen && <div className="px-3 pb-3 sm:px-4">{AskBox({ id: g.root.id })}</div>}
                 {isOpen && (
                   <ol className={cn("relative mx-3 mb-3 ml-5 border-l border-border pl-4 sm:mx-4 sm:ml-7 sm:pl-5", pcOnly && "max-lg:hidden")}>
                     {g.nodes.filter((l) => l.id !== g.root.id).map((l) => {
