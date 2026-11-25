@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Search, Link2, ChevronRight, Pencil, Sparkles } from "lucide-react";
+import { Search, Link2, ChevronDown, ChevronRight, Pencil, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Chip, TypeBadge, cn } from "@/components/ui";
 import type { Chain, LogNode } from "@/lib/types/domain";
@@ -33,6 +33,7 @@ export function ParentPicker({
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(5); // 목록 안 스크롤 대신 "더 보기"(D-006·D-013, #102)
   const [rootId, setRootId] = useState<number | null>(parentNode?.root_id ?? null);
+  const [listOpen, setListOpen] = useState(!!parentNode); // 등록된 장애 건 목록: 평소엔 접어 두고, 이미 고른 건이 있으면 펼친 채로 시작
 
   const groups = useMemo<Group[]>(() => {
     const by = new Map<number, LogNode[]>();
@@ -69,6 +70,7 @@ export function ParentPicker({
 
   const pickRoot = (g: Group) => {
     setRootId(g.root.root_id);
+    setListOpen(true); // 에러 코드 제안으로 골라도 목록에서 고른 건이 보이게
     onChange(String(g.root.id));
   };
 
@@ -125,26 +127,28 @@ export function ParentPicker({
       {/* ① 새 장애 건 — 독립 카드 */}
       <button
         type="button"
-        onClick={() => { setRootId(null); onChange(ROOT); }}
+        onClick={() => { setRootId(null); setListOpen(false); onChange(ROOT); }}
         aria-pressed={value === ROOT}
         className={cn(
-          "flex items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors",
-          value === ROOT ? "border-primary-700 bg-primary-700 text-white" : "border-dashed border-primary-200 bg-card text-ink hover:bg-primary-50",
+          "flex items-center gap-3 rounded-lg border-2 px-4 py-3 text-left text-ink transition-colors",
+          value === ROOT ? "border-primary-700 bg-primary-50" : "border-dashed border-primary-200 bg-card hover:bg-primary-50",
         )}
       >
-        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-base font-bold", value === ROOT ? "bg-white/20" : "bg-primary-100 text-primary-700")}>+</span>
+        <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full text-base font-bold", value === ROOT ? "bg-primary-700 text-white" : "bg-primary-100 text-primary-700")}>+</span>
         <span className="min-w-0">
           <span className="block text-sm font-semibold">새 장애 건 시작</span>
-          <span className={cn("block text-xs", value === ROOT ? "text-white/80" : "text-ink-muted")}>처음 겪는 문제일 때 — 이 로그가 장애 건의 첫 기록이 됩니다</span>
+          <span className="block text-xs text-ink-muted">처음 겪는 문제일 때 — 이 로그가 장애 건의 첫 기록이 됩니다</span>
         </span>
       </button>
 
       {/* ② 등록된 메인 로그 — 선택하면 아래에 하위 로그 트리 */}
       <div className="rounded-lg border border-border">
-        <div className="flex items-center justify-between border-b border-border bg-primary-50 px-3 py-2">
-          <span className="text-xs font-semibold text-ink">이미 등록된 장애 건 {groups.length}건</span>
-          <span className="text-xs text-ink-muted">진행 중 먼저 · 최근 활동순</span>
-        </div>
+        {/* 머리줄을 누르면 목록을 접었다 편다 — 새 장애 건을 적을 때 긴 목록이 화면을 차지하지 않게 */}
+        <button type="button" onClick={() => setListOpen((o) => !o)} aria-expanded={listOpen} className={cn("flex w-full items-center justify-between gap-2 bg-primary-50 px-3 py-2 text-left hover:bg-primary-100 pointer-coarse:min-h-11", listOpen ? "rounded-t-lg border-b border-border" : "rounded-lg")}>
+          <span className="min-w-0 text-xs font-semibold text-ink">이미 등록된 장애 건 {groups.length}건 <span className="font-normal text-ink-muted">· 진행 중 먼저 · 최근 활동순</span></span>
+          <span className="flex shrink-0 items-center gap-1 text-xs font-semibold text-primary-700">{listOpen ? "접기" : "펼쳐서 고르기"}<ChevronDown className={cn("size-3.5 transition-transform", listOpen && "rotate-180")} /></span>
+        </button>
+        {listOpen && <>
         <div className="relative border-b border-border">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="제목 · 에러 코드 · #키워드로 찾기" className="h-10 rounded-none border-0 pl-9 shadow-none focus-visible:ring-0" />
@@ -174,8 +178,8 @@ export function ParentPicker({
             </li>
           )}
         </ul>
+        </>}
       </div>
-
       {/* 선택한 건의 트리에서 위치 선택 */}
       {group && (
         <div className="rounded-lg border border-border bg-primary-50/60 p-2">
