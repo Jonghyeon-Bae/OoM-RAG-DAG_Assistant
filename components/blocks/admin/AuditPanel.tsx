@@ -14,8 +14,8 @@ import { fmtKst } from "@/lib/datetime";
 const actionLabel: Record<string, string> = {
   login_success: "로그인", login_failed: "로그인 실패", login_rejected_locked: "잠긴 계정 로그인 시도", account_locked: "계정 잠김",
   unlocked_by_admin: "잠금 해제(관리자)", logout: "로그아웃", password_changed: "비밀번호 변경", consent: "개인정보 동의", profile_changed: "내 정보 정정",
-  invite: "멤버 초대", role_changed: "역할 변경", member_removed: "부서에서 제외", settings_changed: "부서 설정 변경",
-  password_reset_by_admin: "임시 비밀번호 재발급", user_deactivated: "계정 비활성화", user_reactivated: "계정 재활성화",
+  invite: "멤버 초대", add_member: "부서에 추가", role_changed: "역할 변경", member_removed: "부서에서 제외", settings_changed: "부서 설정 변경",
+  password_reset_by_admin: "임시 비밀번호 재발급", user_deactivated: "계정 비활성화", user_reactivated: "계정 재활성화", user_deleted: "계정 삭제",
 };
 const categoryLabel: Record<AuditItem["category"], string> = { auth: "접속", member: "멤버", settings: "설정" };
 const warnActions = new Set(["login_failed", "login_rejected_locked", "account_locked", "user_deactivated"]);

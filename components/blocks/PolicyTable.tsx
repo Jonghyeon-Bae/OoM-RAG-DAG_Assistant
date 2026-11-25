@@ -21,7 +21,10 @@ export function PolicyTable({ head, rows, used }: { head: string[] | null; rows:
               const hit = !!used?.(i);
               return (
                 <tr key={i} data-used={hit ? "" : undefined} className={cn("border-b border-border last:border-b-0", hit ? "bg-primary-200 text-ink" : anyUsed ? "text-ink-muted" : "text-ink")}>
-                  {r.map((c, j) => <td key={j} className={cn("px-3 py-2 align-top", hit && j === 0 && "shadow-[inset_3px_0_0_var(--color-primary-700)]")}>{c}</td>)}
+                  {/* 첫 칸에만 글이 있는 줄(표 끝의 "【참고】 …" 등)은 줄 전체 폭으로 — 좁은 첫 칸에 세로로 길어지지 않게(백엔드 11/20 §3, #134) */}
+                  {r.length > 1 && r[0] && r.slice(1).every((c) => !c)
+                    ? <td colSpan={r.length} className={cn("px-3 py-2 align-top", hit && "shadow-[inset_3px_0_0_var(--color-primary-700)]")}>{r[0]}</td>
+                    : r.map((c, j) => <td key={j} className={cn("px-3 py-2 align-top", hit && j === 0 && "shadow-[inset_3px_0_0_var(--color-primary-700)]")}>{c}</td>)}
                 </tr>
               );
             })}

@@ -8,6 +8,8 @@ import { UploadsPanel } from "@/components/blocks/documents/UploadsPanel";
 import { ResponsiveSheet, isNarrow } from "@/components/ui/ResponsiveSheet";
 import { History } from "lucide-react";
 import { fmtKst } from "@/lib/datetime";
+import { isFirstPiece, policyBlocks } from "@/lib/policyText";
+import { PolicyTable } from "@/components/blocks/PolicyTable";
 import type { DocEvent, DocStatus, PolicyChunk, PolicyDocument, PolicyUpload, SourceType } from "@/lib/types/domain";
 
 // 규정 문서 관리 (백엔드 #37·#44, #109). 탭: 등록된 문서(폐기·복원·삭제·조문·이력) / 올리기·검수(업로드 → 자동 변환 → 검수 → 승인)
@@ -72,7 +74,12 @@ export function DocumentsView({ wsId, initial, initialEvents, initialUploads, ca
             {panel.items.map((c) => (
               <li key={c.id} className="rounded-lg border bg-white p-3 text-sm">
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-1 text-xs text-ink-muted"><span>{c.article_label}{c.page != null && ` · p.${c.page}`}</span><span className="font-mono">{c.id}</span></div>
-                <p className="whitespace-pre-line leading-relaxed text-ink">{c.text}</p>
+                {/* 조문 속 표는 표로(원문 창 PolicyDocDialog 와 같은 처리, 백엔드 11/20 요청) */}
+                {policyBlocks(c.text, isFirstPiece(c.id)).map((b, j) => b.kind === "table" ? (
+                  <div key={j} className="my-1.5"><PolicyTable head={b.head} rows={b.rows} /></div>
+                ) : (
+                  <p key={j} className="whitespace-pre-line leading-relaxed text-ink">{b.text}</p>
+                ))}
               </li>
             ))}
             {!panel.items.length && <li className="text-sm text-ink-muted">조문이 없습니다.</li>}

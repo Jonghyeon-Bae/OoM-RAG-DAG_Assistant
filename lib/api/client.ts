@@ -40,7 +40,7 @@ const errBody = (e: unknown) => (axios.isAxiosError(e) ? (e.response?.data as { 
 const httpStatus = (e: unknown) => (axios.isAxiosError(e) ? e.response?.status : undefined);
 // 서버 업무 코드({code}) → 사용자 문구. 없으면 서버 message, 그것도 없으면 상태 코드 포함 일반 문구
 const codeText: Record<string, string> = {
-  REASON_REQUIRED: "폐기 사유를 입력해 주세요",
+  REASON_REQUIRED: "사유를 입력해 주세요",
   INVALID_STATUS: "지금 상태에서는 할 수 없는 변경입니다. 화면을 새로 고쳐 주세요",
   PARENT_DEPRECATED: "이어 붙일 상위 로그가 폐기되어 있습니다. 먼저 복원해 주세요",
   PARENT_NOT_FOUND: "상위 로그를 찾을 수 없습니다",
@@ -117,7 +117,7 @@ export async function fetchChain(wsId: number, entryId: number, opts?: { summari
   }
 }
 
-export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string; policy_refs?: PolicyRefInput[] }): Promise<LogNode> {
+export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string; policy_refs?: PolicyRefInput[]; edge_reason?: string }): Promise<LogNode> {
   try {
     const { data } = await api.post<LogNode>("/logs", input, ws(wsId));
     return data;

@@ -519,7 +519,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
                 <div className="mt-2 flex flex-col gap-2 border-t border-border pt-2">
                   {entry.keywords.length > 0 && <div className="flex flex-wrap gap-1.5">{entry.keywords.map((k) => <Chip key={k}>#{k}</Chip>)}</div>}
                   <div className="flex flex-wrap gap-1.5">
-                    {entry.type === "ref" ? null : entry.resolved_at ? (
+                    {entry.type === "ref" || entry.root_id !== entry.id ? null : entry.resolved_at ? (
                       <Button variant="outline" size="xs" onClick={() => resolve(entry, false)}><Undo2 className="size-3" /> 완료 해제</Button>
                     ) : (
                       <Button variant="outline" size="xs" onClick={() => resolve(entry, true)} className="text-success hover:bg-success-bg hover:text-success"><CheckCircle2 className="size-3" /> 완료 처리</Button>
