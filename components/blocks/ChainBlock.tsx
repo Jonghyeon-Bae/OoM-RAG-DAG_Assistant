@@ -7,17 +7,19 @@ import { relationLabel } from "@/lib/relation";
 
 // B-17 / B-45: 깊이별 열(root → 원인 → 해결)로 배치한 체인 블록. 타임라인 그래프(ChainGraph)와 어시스턴트 답변 카드 공용.
 // FE-012 P1-7·8: 원인/해결 표시, 근거 조문(따름·예외·기준 없음), 이 상위에 이어 붙인 이유
-const tone: Record<ChainNode["type"], string> = {
-  fail: "bg-fail-bg text-fail",
-  success: "bg-success-bg text-success",
-  ref: "bg-ref-bg text-ref",
+// 카드는 흰 바탕에 두고 유형 색은 왼쪽 띠와 유형 글자에만 쓴다 — 색 면이 줄어 선과 원인·해결 표시가 먼저 보인다
+const bar: Record<ChainNode["type"], string> = {
+  fail: "shadow-[inset_4px_0_0_var(--color-fail)]",
+  success: "shadow-[inset_4px_0_0_var(--color-success)]",
+  ref: "shadow-[inset_4px_0_0_var(--color-ref)]",
 };
+const tone: Record<ChainNode["type"], string> = { fail: "text-fail", success: "text-success", ref: "text-ref" };
 
 export { relationLabel };
 const relationTone: Record<PolicyRelation, string> = {
-  follows: "bg-white/70 text-primary-700",
+  follows: "bg-primary-100 text-primary-700",
   exception: "bg-warn-bg text-warn",
-  gap: "bg-white/70 text-ink-muted",
+  gap: "bg-ref-bg text-ink-muted",
 };
 // 조문 표기: "환불 규정 제7조" — RefView(REST)는 doc_title+article_label, SSE 는 label 하나만 온다
 const refText = (p: NodePolicyRef) => [p.doc_title, p.article_label].filter(Boolean).join(" ") || p.topic || "";
@@ -28,7 +30,7 @@ function PolicyLine({ p }: { p: NodePolicyRef }) {
   return (
     <li className="flex min-w-0 items-center gap-1.5 text-xs" title={title}>
       <span className={cn("shrink-0 rounded px-1.5 py-0.5 font-semibold", relationTone[p.relation])}>{relationLabel[p.relation]}</span>
-      {text && <span className="truncate opacity-90">{text}</span>}
+      {text && <span className="truncate text-ink-muted">{text}</span>}
       {p.revision && <span className="shrink-0 rounded bg-warn-bg px-1 text-warn">개정</span>}
     </li>
   );
@@ -42,33 +44,32 @@ export function ChainNodeCard({ node, compact = false, selected = false, reasons
   return (
     <div
       className={cn(
-        "rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3",
+        "rounded-xl border bg-card py-2.5 pl-4 pr-3 text-ink sm:py-3 sm:pl-5 sm:pr-4",
         fluid ? "w-full" : compact ? "min-w-[12.5rem] max-w-[17.5rem]" : "min-w-[13.75rem] max-w-[17.5rem]",
-        tone[node.type],
+        bar[node.type],
         deprecated && "opacity-50 grayscale-[0.4]",
-        selected ? "border-primary-700 ring-2 ring-primary-400" : "border-transparent",
+        selected ? "border-primary-700 ring-2 ring-primary-400" : "border-border",
       )}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
-        <span className="size-1.5 rounded-full bg-current" />
-        {typeLabel[node.type]}
+        <span className={cn("font-semibold", tone[node.type])}>{typeLabel[node.type]}</span>
         {node.is_cause && <span className="rounded-full bg-fail px-2 py-0.5 text-xs text-white" title="이 장애 건의 원인으로 표시된 기록">원인</span>}
         {node.resolves_root && <span className="rounded-full bg-success px-2 py-0.5 text-xs text-white" title="이 장애 건을 해결한 기록">해결</span>}
-        {deprecated && <span className="ml-auto rounded-full bg-warn-bg px-2 py-0.5 text-xs text-warn">폐기</span>}
+        {deprecated && <span className="ml-auto rounded-full bg-ref-bg px-2 py-0.5 text-xs text-ref">폐기</span>}
       </div>
       <div className="mt-1 text-sm font-semibold leading-snug">{node.title}</div>
-      {fluid && parents.length > 0 && <p className="mt-1 text-xs opacity-80">앞 기록: {parents.join(" · ")}</p>}
-      {(node.note || (!compact && !fluid && node.path_label)) && <div className="mt-1 text-xs opacity-80">{node.note ?? node.path_label}</div>}
+      {fluid && parents.length > 0 && <p className="mt-1 text-xs text-ink-muted">앞 기록: {parents.join(" · ")}</p>}
+      {(node.note || (!compact && !fluid && node.path_label)) && <div className="mt-1 text-xs text-ink-muted">{node.note ?? node.path_label}</div>}
       {!compact && reasons.length > 0 && (
-        <p className="mt-1.5 flex items-start gap-1 text-xs italic opacity-80" title="앞 기록에 이어 붙인 이유">
+        <p className="mt-1.5 flex items-start gap-1 text-xs italic text-ink-muted" title="앞 기록에 이어 붙인 이유">
           <CornerDownRight className="mt-0.5 size-3 shrink-0" />
           <span className="line-clamp-2">{reasons.join(" / ")}</span>
         </p>
       )}
       {shown.length > 0 && (
-        <ul className="mt-2 flex flex-col gap-1 border-t border-current/15 pt-2">
+        <ul className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
           {shown.map((p, i) => <PolicyLine key={i} p={p} />)}
-          {refs.length > shown.length && <li className="text-xs opacity-70">근거 조문 {refs.length - shown.length}건 더</li>}
+          {refs.length > shown.length && <li className="text-xs text-ink-muted">근거 조문 {refs.length - shown.length}건 더</li>}
         </ul>
       )}
     </div>

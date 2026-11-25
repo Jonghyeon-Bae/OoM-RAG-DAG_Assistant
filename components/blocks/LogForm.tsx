@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { ChevronDown, GitBranch } from "lucide-react";
+import { Check, ChevronDown, GitBranch } from "lucide-react";
 import { ResponsiveSheet } from "@/components/ui/ResponsiveSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,12 +19,8 @@ const guide: Record<LogType, { title: string; body: string }> = {
   ref: { title: "예: 게이트웨이 인증 로그 확인 방법", body: "절차·명령어·링크 등 다음 사람이 그대로 따라 할 수 있는 내용." },
 };
 
-// 유형별 버튼 색: 성공 파랑 / 실패 빨강 / 참고 회색. 선택 시 채움, 미선택 시 옅은 바탕.
-const toneBtn: Record<LogType, { on: string; off: string }> = {
-  success: { on: "border-success bg-success text-white", off: "border-success-bg bg-success-bg text-success hover:brightness-95" },
-  fail: { on: "border-fail bg-fail text-white", off: "border-fail-bg bg-fail-bg text-fail hover:brightness-95" },
-  ref: { on: "border-ref bg-ref text-white", off: "border-ref-bg bg-ref-bg text-ref hover:brightness-95" },
-};
+// 유형 버튼: 유형 색(성공 파랑 / 실패 빨강 / 참고 회색)은 앞의 점에만 둔다. 고른 버튼은 테두리와 체크로 표시해 화면의 색 수를 줄인다.
+const typeDot: Record<LogType, string> = { success: "bg-success", fail: "bg-fail", ref: "bg-ref" };
 
 export function LogForm({ wsId, candidates, onCreated, initialParent, initialPreview }: { wsId: number; candidates: LogNode[]; onCreated?: (n: LogNode) => void; initialParent?: string; initialPreview?: Chain | null }) {
   const [type, setType] = useState<LogType>("fail");
@@ -114,10 +110,14 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
               role="radio"
               aria-checked={t === type}
               onClick={() => setType(t)}
-              className={cn("cursor-pointer flex h-12 items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition-colors", t === type ? toneBtn[t].on : toneBtn[t].off)}
+              className={cn(
+                "cursor-pointer flex h-12 items-center justify-center gap-2 rounded-lg text-sm text-ink transition-colors",
+                t === type ? "border-2 border-primary-700 bg-primary-50 font-bold" : "border border-border bg-card font-medium hover:bg-primary-50",
+              )}
             >
-              <span className="size-2 rounded-full bg-current" />
+              <span className={cn("size-2 rounded-full", typeDot[t])} />
               {typeLabel[t]}
+              {t === type && <Check className="size-3.5 text-primary-700" />}
             </button>
           ))}
         </div>
