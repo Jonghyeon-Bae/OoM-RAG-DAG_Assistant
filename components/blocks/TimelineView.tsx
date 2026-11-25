@@ -333,6 +333,7 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
   const flowBody = (
     chain ? (
       <>
+        {entryRoot && entryRoot.type !== "ref" && <StageBox root={entryRoot} nodes={logs.filter((l) => l.root_id === entryRoot.id)} />}
         <ChainGraph chain={chain} selectedId={entryId} onSelect={select} />
         {/* FE-012 P1-7: 카드에 새로 붙는 표시의 뜻 */}
         <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-muted">
@@ -567,6 +568,45 @@ export function TimelineView({ wsId, logs: initialLogs, initialEntry, initialCha
         </div>
       </ResponsiveSheet>
     </main>
+  );
+}
+// 진행 단계와 다음 할 일 — 이 장애 건이 어디까지 왔고 지금 무엇을 누르면 되는지 알려 준다. 받은 기록에서 바로 계산한다(서버 변경 없음).
+// 원인 = 이어 적은 실패 기록이 있음(또는 "원인으로 표시"함), 해결 = 성공 기록이 있음, 완료 = 완료 처리됨.
+// "원인으로 표시"는 단계와 따로 본다 — 표시가 없으면 안내 문장에서 권한다(보고서의 원인 칸에 실리는 것은 표시한 기록)
+const stageNames = ["발생", "원인", "해결", "완료"];
+function StageBox({ root, nodes }: { root: LogNode; nodes: LogNode[] }) {
+  const live = nodes.filter((n) => n.status === "active" && n.id !== root.id);
+  const marked = live.some((n) => n.category === "cause"); // "원인으로 표시"한 기록이 있음
+  const cause = marked || live.some((n) => n.type === "fail"); // 원인 단계: 이어 적은 실패 기록이 있음
+  const solved = live.some((n) => n.type === "success");
+  const closed = !!root.resolved_at;
+  const done = [true, cause, solved, closed];
+  // 넘어간 단계: 그 단계의 기록은 없는데 뒤 단계는 끝난 경우(예: 원인 기록 없이 바로 해결) — "아직 안 함"과 구분해 – 로 표시한다
+  const skipped = done.map((d, i) => !d && done.slice(i + 1).some(Boolean));
+  const cur = closed ? -1 : done.findIndex((d, i) => !d && !skipped[i]);
+  const mark = marked ? "" : " 원인이 된 실패 기록을 눌러 [원인으로 표시]해 두면 보고서의 원인 칸에 실립니다.";
+  const next = closed
+    ? `완료된 장애 건입니다. [보고서]로 정리해 팀에 공유할 수 있습니다.${cause ? mark : ""}`
+    : solved
+      ? `해결 기록이 있습니다. 다 끝났으면 [완료 처리]를 눌러 주세요.${cause ? mark : ""}`
+      : cause
+        ? `조치한 내용을 성공 기록으로 [로그 추가]해 주세요.${mark}`
+        : "확인한 내용을 [로그 추가]로 이어 적어 주세요. 원인을 찾으면 실패 기록으로 남깁니다.";
+  return (
+    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:gap-5 sm:px-4">
+      <ol className="flex shrink-0 items-start sm:w-72">
+        {stageNames.map((name, i) => (
+          <li key={name} className={cn("flex items-start", i < 3 && "flex-1")}>
+            <span className="flex w-12 flex-col items-center gap-1.5">
+              <span title={skipped[i] ? `${name} 기록 없이 다음 단계로 넘어간 건입니다` : undefined} className={cn("flex size-6 items-center justify-center rounded-full border-2 text-xs font-bold", done[i] ? "border-primary-700 bg-primary-700 text-white" : skipped[i] ? "border-primary-400 bg-primary-50 text-primary-700" : i === cur ? "border-primary-700 bg-card text-primary-700 ring-4 ring-primary-200" : "border-border bg-card text-ink-muted")}>{done[i] ? <Check className="size-3.5" /> : skipped[i] ? "–" : i + 1}</span>
+              <span className={cn("whitespace-nowrap text-xs", done[i] || i === cur ? "font-bold text-ink" : "text-ink-muted")}>{name}{skipped[i] && " 없음"}</span>
+            </span>
+            {i < 3 && <span aria-hidden className={cn("mt-[0.6875rem] h-0.5 flex-1", (done[i] || skipped[i]) && (done[i + 1] || skipped[i + 1]) ? "bg-primary-700" : "bg-border")} />}
+          </li>
+        ))}
+      </ol>
+      <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink sm:border-l sm:border-border sm:pl-5"><b className="text-primary-700">{closed ? "안내" : "다음 할 일"}</b><br />{next}</p>
+    </div>
   );
 }
 
