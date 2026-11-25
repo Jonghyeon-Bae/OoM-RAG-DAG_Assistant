@@ -3,17 +3,29 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui";
-import { patchWorkspaceSettings } from "@/lib/api/client";
+import { Button } from "@/components/ui/button";
+import { joinWorkspace, patchWorkspaceSettings } from "@/lib/api/client";
 import { modeOf, modeLabel, modeTone } from "@/lib/mode";
 import type { ManageableWorkspace } from "@/lib/types/domain";
 
 // 부서 설정 (백엔드 요청 G, D-5): 규정 사용 · 사례 사용 스위치. can_configure 인 부서만 내려온다(회사 관리자는 회사 전 부서).
 // 둘 다 끌 수 없다 — 화면에서 막고 서버도 400 NO_SOURCE. 바꾸면 사이드바·헤더가 새 모드를 보도록 router.refresh()
-export function DeptSettingsPanel({ initial }: { initial: ManageableWorkspace[] }) {
+// 회사 관리자는 속하지 않은 부서도 설정할 수 있지만 그 부서 화면(멤버·기록)은 못 본다 — [이 부서 들어가기]로 일반 멤버가 된다(백엔드 #55)
+export function DeptSettingsPanel({ initial, memberWsIds, companyAdmin }: { initial: ManageableWorkspace[]; memberWsIds: number[]; companyAdmin: boolean }) {
   const router = useRouter();
   const [rows, setRows] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ id: number; text: string; ok: boolean } | null>(null);
+  const [joined, setJoined] = useState<number[]>(memberWsIds);
+  const join = async (w: ManageableWorkspace) => {
+    setBusy(`${w.id}-join`); setMsg(null);
+    const r = await joinWorkspace(w.id);
+    setBusy(null);
+    if (!r.ok) { setMsg({ id: w.id, text: r.message, ok: false }); return; }
+    setJoined((j) => [...j, w.id]);
+    setMsg({ id: w.id, text: "멤버로 들어갔습니다 — 위쪽 부서 선택에서 이 부서로 옮길 수 있습니다", ok: true });
+    router.refresh();
+  };
   const toggle = async (w: ManageableWorkspace, key: "policy_enabled" | "case_enabled") => {
     const next = !w[key];
     setBusy(`${w.id}-${key}`); setMsg(null);
@@ -53,6 +65,9 @@ export function DeptSettingsPanel({ initial }: { initial: ManageableWorkspace[] 
             </div>
             {sw(w, "policy_enabled", "규정 사용", "사내 규정 조문을 근거로 답합니다")}
             {sw(w, "case_enabled", "해결 사례 사용", "이 부서의 장애 해결 기록을 근거로 답합니다")}
+            {companyAdmin && !joined.includes(w.id) && (
+              <Button size="xs" variant="outline" disabled={busy !== null} onClick={() => join(w)} title="이 부서의 일반 멤버가 됩니다. 멤버·기록을 보거나 후임 관리자를 지정할 수 있습니다">이 부서 들어가기</Button>
+            )}
             {msg?.id === w.id && <span role="status" className={`w-full text-xs ${msg.ok ? "text-success" : "text-fail"}`}>{msg.text}</span>}
           </li>
         ))}

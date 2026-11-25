@@ -15,7 +15,7 @@ import type { DocEvent, DocStatus, PolicyChunk, PolicyDocument, PolicyUpload, So
 // 규정 문서 관리 (백엔드 #37·#44, #109). 탭: 등록된 문서(폐기·복원·삭제·조문·이력) / 올리기·검수(업로드 → 자동 변환 → 검수 → 승인)
 // 권한은 서버가 문서마다 can_manage 로 알려 준다 — 화면은 그 값으로 버튼을 숨기기만 한다
 const srcLabel: Record<SourceType, string> = { pdf: "PDF", hwp: "HWP", markdown: "Markdown", json: "JSON" };
-const actionLabel: Record<string, string> = { uploaded: "등록", indexed: "등록(색인)", superseded: "새 판으로 대체", retired: "폐기", restored: "복원", deleted: "삭제" };
+const actionLabel: Record<string, string> = { uploaded: "등록", indexed: "등록(색인)", superseded: "새 판으로 대체", retired: "폐기", restored: "복원", deleted: "삭제", moved: "공간 이동" };
 const actionTone: Record<string, "neutral" | "primary" | "warn" | "fail" | "dark"> = { uploaded: "neutral", indexed: "primary", superseded: "dark", retired: "dark", restored: "primary", deleted: "fail" };
 export const fmtAt = (iso: string | null) => fmtKst(iso, "YY. M. D. HH:mm");
 

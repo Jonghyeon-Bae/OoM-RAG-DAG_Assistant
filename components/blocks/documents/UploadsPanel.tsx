@@ -76,12 +76,12 @@ export function UploadsPanel({ wsId, initial, docs, canUpload, companyAdmin, onA
         </Card>
       </div>
       <div className="hidden min-w-0 lg:block">
-        {openId ? <UploadDetail key={openId} wsId={wsId} id={openId} onChanged={changed} onApproved={onApproved} /> : (
+        {openId ? <UploadDetail key={openId} wsId={wsId} id={openId} listStatus={items.find((x) => x.id === openId)?.status} onChanged={changed} onApproved={onApproved} /> : (
           <Card className="p-8 text-center text-sm text-ink-muted">왼쪽에서 파일을 고르면 변환 결과를 검수할 수 있습니다.</Card>
         )}
       </div>
       <ResponsiveSheet open={sheetOpen && !!openId} onClose={() => setSheetOpen(false)} title="변환 결과 검수" description={items.find((u) => u.id === openId)?.original_name}>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{sheetOpen && openId && <UploadDetail key={`s-${openId}`} wsId={wsId} id={openId} onChanged={changed} onApproved={onApproved} />}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{sheetOpen && openId && <UploadDetail key={`s-${openId}`} wsId={wsId} id={openId} listStatus={items.find((x) => x.id === openId)?.status} onChanged={changed} onApproved={onApproved} />}</div>
       </ResponsiveSheet>
     </div>
   );
@@ -144,7 +144,7 @@ function UploadForm({ wsId, docs, companyAdmin, onAdded }: { wsId: number; docs:
   );
 }
 
-function UploadDetail({ wsId, id, onChanged, onApproved }: { wsId: number; id: number; onChanged: (u: PolicyUpload) => void; onApproved: () => void }) {
+function UploadDetail({ wsId, id, listStatus, onChanged, onApproved }: { wsId: number; id: number; listStatus?: UploadStatus; onChanged: (u: PolicyUpload) => void; onApproved: () => void }) {
   const [u, setU] = useState<PolicyUpload | null>(null);
   const [md, setMd] = useState("");
   const [busy, setBusy] = useState(false);
@@ -169,10 +169,18 @@ function UploadDetail({ wsId, id, onChanged, onApproved }: { wsId: number; id: n
     return () => clearInterval(t);
   }, [status, wsId, id, onChanged, onApproved]);
 
+  // 목록이 먼저 알아챈 상태 변화(다른 검수자의 승인·반려, 워커의 완료)를 상세가 따라간다 — 상태가 다를 때만 다시 읽는다(백엔드 제안 7.2)
+  useEffect(() => {
+    if (!status || !listStatus || listStatus === status) return;
+    let alive = true;
+    fetchUpload(wsId, id).then((x) => { if (alive && x && x.status !== status) { setU(x); setMd(x.markdown ?? ""); } });
+    return () => { alive = false; };
+  }, [listStatus, status, wsId, id]);
+
   if (!u) return <Card className="p-8 text-center text-sm text-ink-muted"><Loader2 className="mx-auto size-4 animate-spin" /></Card>;
   const r = u.report ?? {};
   const edited = (u.markdown ?? "") !== md;
-  const act = async (action: "markdown" | "approve" | "reject" | "retry", body?: { markdown?: string; reason?: string }) => {
+  const act = async (action: "markdown" | "approve" | "reject" | "retry", body?: { markdown?: string; reason?: string; strip_page_numbers?: boolean }) => {
     setBusy(true); setMsg(null);
     const res = await uploadAction(wsId, u.id, action, body);
     setBusy(false);
@@ -226,6 +234,18 @@ function UploadDetail({ wsId, id, onChanged, onApproved }: { wsId: number; id: n
             <details className="rounded-lg border border-border p-3 text-xs">
               <summary className="cursor-pointer font-medium text-ink">원본과 대조할 줄 {r.ocr_suspects.length}개</summary>
               <ul className="mt-2 flex flex-col gap-1">{r.ocr_suspects.map((s) => <li key={s.line} className="font-mono"><span className="text-ink-muted">{s.line}행</span> {s.text}</li>)}</ul>
+            </details>
+          )}
+          {!!r.page_numbers?.length && (
+            <details className="rounded-lg border border-border p-3 text-xs">
+              <summary className="cursor-pointer font-medium text-ink">쪽 번호로 보이는 줄 {r.page_numbers.length}개</summary>
+              <ul className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto">{r.page_numbers.map((s) => <li key={s.line} className="font-mono"><span className="text-ink-muted">{s.line}행</span> {s.text}</li>)}</ul>
+              {review && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button size="xs" variant="outline" disabled={busy} onClick={() => act("markdown", { markdown: md, strip_page_numbers: true })}>쪽 번호 {r.page_numbers.length}줄 지우기</Button>
+                  <span className="text-ink-muted">지금 변환본{edited ? "(고친 내용 포함)" : ""}을 저장하면서 위 줄을 지우고 조문 미리보기를 다시 만듭니다.</span>
+                </div>
+              )}
             </details>
           )}
           {!!r.articles?.length && (

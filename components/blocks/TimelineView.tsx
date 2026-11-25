@@ -593,8 +593,10 @@ function StageBox({ root, nodes }: { root: LogNode; nodes: LogNode[] }) {
         ? `조치한 내용을 성공 기록으로 [로그 추가]해 주세요.${mark}`
         : "확인한 내용을 [로그 추가]로 이어 적어 주세요. 원인을 찾으면 실패 기록으로 남깁니다.";
   return (
-    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:gap-5 sm:px-4">
-      <ol className="flex shrink-0 items-start sm:w-72">
+    // 가로 배치는 화면 폭이 아니라 이 칸의 폭으로 정한다(@container) — 1024 폭에서는 오른쪽 칸이 좁아 안내 글이 75px 로 눌렸다(CL-008 D-1)
+    <div className="@container mb-4">
+    <div className="flex flex-col gap-3 rounded-xl border border-border p-3 @xl:flex-row @xl:items-center @xl:gap-5 @xl:px-4">
+      <ol className="flex shrink-0 items-start @xl:w-72">
         {stageNames.map((name, i) => (
           <li key={name} className={cn("flex items-start", i < 3 && "flex-1")}>
             <span className="flex w-12 flex-col items-center gap-1.5">
@@ -605,7 +607,8 @@ function StageBox({ root, nodes }: { root: LogNode; nodes: LogNode[] }) {
           </li>
         ))}
       </ol>
-      <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink sm:border-l sm:border-border sm:pl-5"><b className="text-primary-700">{closed ? "안내" : "다음 할 일"}</b><br />{next}</p>
+      <p className="min-w-0 flex-1 text-sm leading-relaxed text-ink @xl:border-l @xl:border-border @xl:pl-5"><b className="text-primary-700">{closed ? "안내" : "다음 할 일"}</b><br />{next}</p>
+    </div>
     </div>
   );
 }

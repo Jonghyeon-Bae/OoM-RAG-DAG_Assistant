@@ -47,8 +47,12 @@ export async function logout(): Promise<void> {
   if (typeof window !== "undefined") window.location.assign("/login");
 }
 
-export async function consent(): Promise<{ ok: true } | AuthFail> {
-  try { await api.post("/auth/consent"); return { ok: true }; } catch (e) { return fail(e, "동의 처리에 실패했습니다"); }
+// version = 화면이 보여 준 처리방침 판(X-Policy-Version). 그사이 문안이 바뀌었으면 409 CONSENT_VERSION_MISMATCH — 문안을 다시 불러 다시 동의받는다(백엔드 #40)
+export async function consent(version?: string | null): Promise<{ ok: true } | (AuthFail & { code?: string })> {
+  try { await api.post("/auth/consent", version ? { version } : undefined); return { ok: true }; } catch (e) { return fail(e, "동의 처리에 실패했습니다"); }
+}
+export async function privacyPolicyWithVersion(): Promise<{ text: string; version: string | null } | null> {
+  try { const r = await api.get<string>("/auth/privacy-policy", { responseType: "text", transformResponse: (x) => x }); return { text: r.data, version: (r.headers["x-policy-version"] as string | undefined) ?? null }; } catch { return null; }
 }
 
 /** 400 PASSWORD_POLICY: message 가 " / " 로 이어진 위반 목록. 403: 현재 비밀번호 불일치 */

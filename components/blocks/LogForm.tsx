@@ -24,6 +24,7 @@ const typeDot: Record<LogType, string> = { success: "bg-success", fail: "bg-fail
 
 export function LogForm({ wsId, candidates, onCreated, initialParent, initialPreview }: { wsId: number; candidates: LogNode[]; onCreated?: (n: LogNode) => void; initialParent?: string; initialPreview?: Chain | null }) {
   const [type, setType] = useState<LogType>("fail");
+  const [bodyLen, setBodyLen] = useState(0); // 본문 글자 수 표시(서버 상한 5,000)
   const [parent, setParent] = useState<string>(initialParent && candidates.some((c) => String(c.id) === initialParent) ? initialParent : ROOT);
   const [title, setTitle] = useState("");
   const [resolveRoot, setResolveRoot] = useState(false);
@@ -51,6 +52,9 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
         resolve_root: resolveRoot,
         edge_reason: parent !== ROOT ? String(fd.get("edge_reason") ?? "").trim() || undefined : undefined, // 상위에 이어 붙인 이유(선택, 300자 — 백엔드 #31). 흐름 카드의 ↳ 와 보고서 원인 칸의 "연결 이유"에 쓰인다
         problem_title: parent === ROOT && type === "success" ? String(fd.get("problem_title") ?? "").trim() : undefined,
+        // 원인 표시: 상위가 있는 실패 기록일 때만(아니면 서버 400 CATEGORY_INVALID). 한 번에 등록(해결부터)은 원인 한 줄로 장애 건 → 원인 → 해결 세 기록을 만든다(백엔드 #33)
+        ...(type === "fail" && parent !== ROOT && fd.get("is_cause") ? { category: "cause" as const } : {}),
+        ...(type === "success" && parent === ROOT && String(fd.get("cause_title") ?? "").trim() ? { cause_title: String(fd.get("cause_title")).trim() } : {}),
         ...(refs.length ? { policy_refs: refs.map(toInput) } : {}),
       });
       onCreated?.(node);
@@ -60,6 +64,7 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
       setParent(ROOT);
       setPreview(null);
       setResolveRoot(false);
+      setBodyLen(0);
       setRefs([]);
       setBusy(false);
     } catch (err) {
@@ -132,13 +137,28 @@ export function LogForm({ wsId, candidates, onCreated, initialParent, initialPre
           <Input id="log-problem" name="problem_title" maxLength={200} className="h-11" placeholder="예: 이미지 업로드 시 413 오류" required />
         </Field>
       )}
+      {type === "success" && parent === ROOT && (
+        <Field label="원인 (선택)" htmlFor="log-cause" hint="적으면 문제 → 원인 → 이 해결 순서로 세 기록이 만들어지고, 보고서의 원인 칸에 실립니다.">
+          <Input id="log-cause" name="cause_title" maxLength={200} className="h-11" placeholder="예: 프록시의 본문 크기 제한이 1MB" />
+        </Field>
+      )}
       <Field label="제목" htmlFor="log-title">
         <Input id="log-title" name="title" maxLength={200} className="h-11" placeholder={guide[type].title} required value={title} onChange={(e) => setTitle(e.target.value)} />
       </Field>
       <Field label="내용" htmlFor="log-body">
-        <Textarea id="log-body" name="body" maxLength={5000} className="min-h-[7.5rem]" placeholder={guide[type].body} required />
+        <Textarea id="log-body" name="body" maxLength={5000} className="min-h-[7.5rem]" placeholder={guide[type].body} required onChange={(e) => setBodyLen(e.target.value.length)} />
+        <p className={cn("mt-1 text-right text-xs tabular-nums", bodyLen >= 4500 ? "text-warn" : "text-ink-muted")}>{bodyLen.toLocaleString("en-US")} / 5,000</p>
       </Field>
 
+      {type === "fail" && parent !== ROOT && (
+        <label className="flex items-start gap-3 rounded-lg border border-fail-bg bg-fail-bg/40 p-3 text-sm">
+          <input type="checkbox" name="is_cause" className="mt-0.5 size-4" />
+          <span>
+            <span className="font-semibold text-fail">이 기록은 장애의 원인입니다</span>
+            <span className="mt-0.5 block text-xs text-ink-muted">흐름에 원인 배지가 붙고 보고서의 원인 칸에 실립니다. 부수적으로 드러난 문제면 체크하지 않습니다. 등록 뒤 타임라인에서 바꿀 수 있습니다.</span>
+          </span>
+        </label>
+      )}
       {parent !== ROOT && (
         <Field label="왜 이 기록에 이어 붙이나요? (선택)" htmlFor="log-edge-reason">
           <Input id="log-edge-reason" name="edge_reason" maxLength={300} className="h-11" placeholder={type === "fail" ? "예: 같은 오류가 이 설정을 바꾼 뒤부터 났다" : type === "success" ? "예: 이 원인을 없애는 조치" : "예: 이 조치에 쓴 절차 문서"} />

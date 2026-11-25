@@ -63,6 +63,8 @@ const codeText: Record<string, string> = {
   SELF_DEACTIVATION: "자기 자신의 계정은 비활성화할 수 없습니다",
   LAST_COMPANY_ADMIN: "회사 관리자가 한 명은 있어야 합니다",
   ALREADY_INACTIVE: "이미 비활성화된 계정입니다",
+  ACCOUNT_ACTIVE: "활성 계정은 삭제할 수 없습니다. 먼저 비활성화해 주세요",
+  EMPLOYEE_NO_DELETED: "삭제된 계정이 쓰던 사번이라 다시 쓸 수 없습니다",
   EMAIL_TAKEN: "다른 계정이 이미 쓰는 이메일입니다",
   FILE_TOO_LARGE: "30MB를 넘는 파일은 올릴 수 없습니다",
   VALIDATION: "입력한 내용을 확인해 주세요(빈 칸이 있거나 너무 깁니다)",
@@ -117,7 +119,7 @@ export async function fetchChain(wsId: number, entryId: number, opts?: { summari
   }
 }
 
-export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string; policy_refs?: PolicyRefInput[]; edge_reason?: string }): Promise<LogNode> {
+export async function postLog(wsId: number, input: { type: LogType; title: string; body: string; parent_id: number | null; resolve_root?: boolean; problem_title?: string; policy_refs?: PolicyRefInput[]; edge_reason?: string; category?: "cause"; cause_title?: string }): Promise<LogNode> {
   try {
     const { data } = await api.post<LogNode>("/logs", input, ws(wsId));
     return data;
@@ -369,10 +371,10 @@ export async function fetchUpload(wsId: number, id: number): Promise<PolicyUploa
 }
 
 // 검수 동작: markdown 저장(→ 재변환) · approve(→ 등록) · reject(사유) · retry(실패 건)
-export async function uploadAction(wsId: number, id: number, action: "markdown" | "approve" | "reject" | "retry", body?: { markdown?: string; reason?: string }): Promise<{ ok: true; upload: PolicyUpload } | ApiFail> {
+export async function uploadAction(wsId: number, id: number, action: "markdown" | "approve" | "reject" | "retry", body?: { markdown?: string; reason?: string; strip_page_numbers?: boolean }): Promise<{ ok: true; upload: PolicyUpload } | ApiFail> {
   try {
     const { data } = action === "markdown"
-      ? await api.put<PolicyUpload>(`/documents/uploads/${id}/markdown`, { markdown: body?.markdown }, ws(wsId))
+      ? await api.put<PolicyUpload>(`/documents/uploads/${id}/markdown`, { markdown: body?.markdown, ...(body?.strip_page_numbers ? { strip_page_numbers: true } : {}) }, ws(wsId))
       : await api.post<PolicyUpload>(`/documents/uploads/${id}/${action}`, action === "reject" ? { reason: body?.reason } : null, ws(wsId));
     return { ok: true, upload: data };
   } catch (e) {
@@ -455,6 +457,34 @@ export async function reactivateUser(wsId: number, userId: number): Promise<{ ok
     return { ok: true };
   } catch (e) {
     return fail(e, "계정 재활성화");
+  }
+}
+
+// 기록의 근거 조문을 통째로 바꾼다(빈 목록이면 비움) — 개정으로 대응 조문이 없어진 근거를 다시 연결할 때 쓴다
+export async function putPolicyRefs(wsId: number, id: number, refs: PolicyRefInput[]): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.put(`/logs/${id}/policy-refs`, { policy_refs: refs }, ws(wsId));
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "근거 조문 다시 연결");
+  }
+}
+// 계정 삭제(회사 관리자, 비활성 계정만 — 백엔드 #55). 개인정보를 지우고 되돌릴 수 없다. 사번은 남아 다시 쓸 수 없고, 쓴 기록의 작성자는 "삭제된 계정"으로 보인다
+export async function deleteUser(userId: number, reason?: string): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.delete(`/users/${userId}`, { data: reason ? { reason } : undefined });
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "계정 삭제");
+  }
+}
+// 회사 관리자가 자기 회사의 부서에 일반 멤버로 들어간다(부서 헤더·본문 없음 — 백엔드 #55). 하나뿐인 관리자가 없어진 부서의 후임을 지정하려면 먼저 속해야 한다
+export async function joinWorkspace(workspaceId: number): Promise<{ ok: true } | ApiFail> {
+  try {
+    await api.post(`/workspaces/${workspaceId}/join`);
+    return { ok: true };
+  } catch (e) {
+    return fail(e, "부서 들어가기");
   }
 }
 

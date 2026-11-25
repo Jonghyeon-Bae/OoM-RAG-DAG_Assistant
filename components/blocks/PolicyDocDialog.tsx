@@ -11,7 +11,8 @@ import type { PolicyChunk, PolicyRef } from "@/lib/types/domain";
 // 규정 원문 창 (폰·PC 공통): 뒤 화면을 반투명으로 가리고, 문서 전체를 조문 순서대로 펼친다.
 // 답변에 쓰인 조문은 반투명 노란색으로 칠하고 그 위치로 바로 이동한다.
 // 지금은 문서의 글 조각(GET /documents/{id}/chunks)으로 그린다. 문서가 PDF 로 확정되면 DocBody 만 PDF 뷰어로 바꾸면 된다(창 · 제목 · 닫기는 그대로).
-export function PolicyDocDialog({ wsId, source, open, onClose }: { wsId: number; source: PolicyRef | null; open: boolean; onClose: () => void }) {
+// hitLabel · description = 답변이 아닌 곳(기록 카드의 근거 조문)에서 열 때의 문구
+export function PolicyDocDialog({ wsId, source, open, onClose, hitLabel, description }: { wsId: number; source: PolicyRef | null; open: boolean; onClose: () => void; hitLabel?: string; description?: string }) {
   return (
     <Dialog.Root open={open && !!source} onOpenChange={(next) => { if (!next) onClose(); }}>
       <Dialog.Portal>
@@ -20,11 +21,11 @@ export function PolicyDocDialog({ wsId, source, open, onClose }: { wsId: number;
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3 lg:px-6">
             <div className="min-w-0">
               <Dialog.Title className="truncate text-base font-bold text-ink">{source ? `${source.doc_title} ${source.version}` : "규정 원문"}</Dialog.Title>
-              <Dialog.Description className="text-xs text-ink-muted">규정 원문 전체입니다. 답변에 쓰인 조문을 노란색으로 표시했습니다.</Dialog.Description>
+              <Dialog.Description className="text-xs text-ink-muted">{description ?? "규정 원문 전체입니다. 답변에 쓰인 조문을 노란색으로 표시했습니다."}</Dialog.Description>
             </div>
             <Dialog.Close aria-label="닫기" className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-50 text-ink hover:bg-primary-100"><X className="size-5" /></Dialog.Close>
           </div>
-          {source && <DocBody key={`${source.doc_id}-${source.chunk_id}`} wsId={wsId} source={source} />}
+          {source && <DocBody key={`${source.doc_id}-${source.chunk_id}`} wsId={wsId} source={source} hitLabel={hitLabel} />}
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
@@ -32,7 +33,7 @@ export function PolicyDocDialog({ wsId, source, open, onClose }: { wsId: number;
 }
 
 // 문서 본문. PDF 로 바꿀 때 이 컴포넌트만 교체한다
-function DocBody({ wsId, source }: { wsId: number; source: PolicyRef }) {
+function DocBody({ wsId, source, hitLabel }: { wsId: number; source: PolicyRef; hitLabel?: string }) {
   const [chunks, setChunks] = useState<PolicyChunk[] | null>(null); // null = 불러오는 중
   const markRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -56,7 +57,7 @@ function DocBody({ wsId, source }: { wsId: number; source: PolicyRef }) {
           const hit = isHit(c);
           return (
             <section key={c.id} ref={i === first ? markRef : undefined} className={cn("rounded-lg px-3 py-2", hit && "bg-yellow-300/35 shadow-[inset_3px_0_0_var(--color-warn)]")}>
-              {i === first && <span className="mb-1 inline-block rounded-full bg-primary-700 px-2 py-0.5 text-xs font-semibold text-white">규정 {source.ref.slice(1)} · 답변에 쓰인 조문</span>}
+              {i === first && <span className="mb-1 inline-block rounded-full bg-primary-700 px-2 py-0.5 text-xs font-semibold text-white">{hitLabel ?? `규정 ${source.ref.slice(1)} · 답변에 쓰인 조문`}</span>}
               {c.article_label !== chunks[i - 1]?.article_label && <h3 className="text-sm font-bold text-ink">{c.article_label}</h3>}
               {/* 글은 ①②③ 항마다 한 문단, 표("| 칸 |" 줄)는 표로 */}
               {policyBlocks(c.text, isFirstPiece(c.id)).map((b, j) => b.kind === "table" ? (

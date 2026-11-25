@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Chip, Field } from "@/components/ui";
-import { ACCOUNT_API_READY, changeMemberRole, deactivateUser, fetchInactiveUsers, fetchMembers, inviteUser, reactivateUser, removeMember, resetUserPassword, unlockUser } from "@/lib/api/client";
+import { ACCOUNT_API_READY, changeMemberRole, deactivateUser, deleteUser, fetchInactiveUsers, fetchMembers, inviteUser, reactivateUser, removeMember, resetUserPassword, unlockUser } from "@/lib/api/client";
 import type { InactiveUser, InviteResult, Member, MemberRole } from "@/lib/types/domain";
 
 // 멤버: 목록(이메일 마스킹) · 초대(임시 비밀번호 1회 표시) · 잠금 해제 — 현재 워크스페이스 admin 전용 (D-5)
@@ -15,7 +15,7 @@ const MULTI_DEPT = "여러 부서에 속한 계정이라 회사 관리자만 할
 
 export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { wsId: number; wsName: string; initial: Member[]; meId: number; companyAdmin: boolean }) {
   const [members, setMembers] = useState(initial);
-  const [form, setForm] = useState({ employee_no: "", name: "", email: "", title: "", role: "member" as MemberRole });
+  const [form, setForm] = useState({ employee_no: "", name: "", email: "", grade: "", position: "", role: "member" as MemberRole });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InviteResult | null>(null);
@@ -30,12 +30,12 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
     setBusy(true); setError(null); setResult(null); setCopied(false);
     const r = await inviteUser(wsId, {
       employee_no: form.employee_no.trim(), name: form.name.trim(), role: form.role,
-      ...(form.email.trim() ? { email: form.email.trim() } : {}), ...(form.title.trim() ? { title: form.title.trim() } : {}),
+      ...(form.email.trim() ? { email: form.email.trim() } : {}), ...(form.grade.trim() ? { grade: form.grade.trim() } : {}), ...(form.position.trim() ? { position: form.position.trim() } : {}),
     });
     setBusy(false);
     if (!r.ok) { setError(r.message); return; }
     setResult(r.data);
-    setForm({ employee_no: "", name: "", email: "", title: "", role: "member" });
+    setForm({ employee_no: "", name: "", email: "", grade: "", position: "", role: "member" });
     await reload();
   };
   const unlock = async (m: Member) => {
@@ -50,7 +50,8 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
   const [openId, setOpenId] = useState<number | null>(null);
   const [confirm, setConfirm] = useState<{ id: number; kind: "remove" | "deactivate"; reason: string } | null>(null);
   const [acting, setActing] = useState(false);
-  const [reset, setReset] = useState<{ name: string; temp: string } | null>(null);
+  const [reset, setReset] = useState<{ id: number; name: string; temp: string } | null>(null); // 누른 사람의 관리 칸 안에 보인다
+  const [delId, setDelId] = useState<number | null>(null); // 비활성 계정 삭제 확인
   // 비활성 계정(회사 관리자) — 비활성화하면 멤버 목록에서 빠지므로 다시 활성화할 곳이 여기뿐이다
   const [inactive, setInactive] = useState<InactiveUser[] | null>(null);
   const [inactiveErr, setInactiveErr] = useState<string | null>(null);
@@ -67,9 +68,10 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
     const r = await run();
     setActing(false);
     setNotice(r.ok ? label : r.message);
-    if (r.ok) { setConfirm(null); if (close) setOpenId(null); await reload(); if (showInactive) await loadInactive(); }
+    if (r.ok) { setConfirm(null); setDelId(null); if (close) setOpenId(null); await reload(); if (showInactive) await loadInactive(); }
   };
   const reactivate = (u: InactiveUser) => act(`${u.name} 계정을 다시 활성화했습니다 — 소속 부서는 그대로입니다`, () => reactivateUser(wsId, u.id));
+  const removeAccount = (u: InactiveUser) => act(`${u.name}(${u.employee_no}) 계정을 삭제했습니다 — 쓴 기록은 "삭제된 계정" 이름으로 남습니다`, () => deleteUser(u.id));
   const setRole = (m: Member, role: MemberRole) => act(`${m.name}: ${roleLabel[role]}(으)로 바꿨습니다`, async () => { const r = await changeMemberRole(wsId, m.id, role); return r.ok ? { ok: true } : r; }, false);
   const remove = (m: Member) => act(`${m.name}을(를) ${wsName}에서 제외했습니다 — 계정과 작성한 기록은 남습니다`, () => removeMember(wsId, m.id));
   const deactivate = (m: Member, reason: string) => act(`${m.name} 계정을 비활성화했습니다 — 로그인할 수 없고, 작성한 기록은 남습니다`, () => deactivateUser(wsId, m.id, reason));
@@ -77,7 +79,7 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
     setActing(true); setNotice(null);
     const r = await resetUserPassword(wsId, m.id);
     setActing(false);
-    if (r.ok) setReset({ name: m.name, temp: r.temp_password }); else setNotice(r.message);
+    if (r.ok) setReset({ id: m.id, name: m.name, temp: r.temp_password }); else setNotice(r.message);
   };
 
   const manage = (m: Member) => {
@@ -97,6 +99,15 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
             <Button size="xs" variant="outline" disabled={pending || self || acting || m.can_manage_account === false} onClick={() => resetPw(m)} title={pending ? "백엔드 API 준비 중(FE-REQ-004)" : m.can_manage_account === false ? MULTI_DEPT : "새 임시 비밀번호를 한 번 보여 줍니다. 다음 로그인 때 바꾸게 됩니다(그 사람의 로그인은 풀립니다)"}>임시 비밀번호 재발급</Button>
           </div>
           {!self && m.can_manage_account === false && <p className="text-xs text-ink-muted">{MULTI_DEPT} (비밀번호 재발급·잠금 해제)</p>}
+          {reset?.id === m.id && (
+            <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-primary-200 bg-card p-2.5 text-sm">
+              <span>임시 비밀번호(한 번만 표시):</span>
+              <code className="rounded bg-primary-50 px-2 py-0.5 font-mono">{reset.temp}</code>
+              <Button size="xs" variant="outline" onClick={() => navigator.clipboard?.writeText(reset.temp)}><Copy className="size-3" /> 복사</Button>
+              <Button size="xs" variant="ghost" onClick={() => setReset(null)}>닫기</Button>
+              <span className="basis-full text-xs text-warn">본인에게 직접 전달하고 메신저·메일 기록에 남기지 마세요. 다음 로그인 때 새 비밀번호를 정하게 됩니다.</span>
+            </div>
+          )}
         </div>
         {companyAdmin && (
           <div className="flex flex-col gap-1.5">
@@ -122,7 +133,7 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
       </div>
     );
   };
-  const toggle = (m: Member) => { setConfirm(null); setOpenId((o) => (o === m.id ? null : m.id)); };
+  const toggle = (m: Member) => { setConfirm(null); setReset(null); setOpenId((o) => (o === m.id ? null : m.id)); };
   const manageBtn = (m: Member) => (
     <Button size="xs" variant="ghost" aria-expanded={openId === m.id} onClick={() => toggle(m)} title="역할·제외·계정 관리"><Settings2 className="size-3" /> 관리</Button>
   );
@@ -141,14 +152,6 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
           <h2 className="font-bold text-ink">{wsName} 멤버 <span className="text-sm font-normal text-ink-muted">{members.length}명</span></h2>
           {notice && <span role="status" className="text-xs text-ink-muted">{notice}</span>}
         </div>
-        {reset && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 p-3 text-sm">
-            <span><b>{reset.name}</b> 임시 비밀번호(한 번만 표시):</span>
-            <code className="rounded bg-white px-2 py-0.5 font-mono">{reset.temp}</code>
-            <Button size="xs" variant="outline" onClick={() => navigator.clipboard?.writeText(reset.temp)}><Copy className="size-3" /> 복사</Button>
-            <Button size="xs" variant="ghost" onClick={() => setReset(null)}>닫기</Button>
-          </div>
-        )}
         {/* 휴대폰: 표 대신 2줄 목록(가로 스크롤 없이) */}
         <ul className="divide-y divide-border sm:hidden">
           {members.map((m) => (
@@ -194,7 +197,10 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
         <form onSubmit={invite} className="flex flex-col gap-3">
           <Field label="사번" htmlFor="inv-no"><Input id="inv-no" className="h-10" placeholder="OOM0006" value={form.employee_no} onChange={(e) => setForm({ ...form, employee_no: e.target.value })} required pattern="[A-Za-z0-9-]{3,32}" /></Field>
           <Field label="이름" htmlFor="inv-name"><Input id="inv-name" maxLength={50} className="h-10" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></Field>
-          <Field label="직함 (선택)" htmlFor="inv-title"><Input id="inv-title" maxLength={63} className="h-10" placeholder="예: 매니저" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="직급 (선택)" htmlFor="inv-grade"><Input id="inv-grade" maxLength={30} className="h-10" placeholder="예: 과장" value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} /></Field>
+            <Field label="직책 (선택)" htmlFor="inv-position"><Input id="inv-position" maxLength={30} className="h-10" placeholder="예: 팀장" value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></Field>
+          </div>
           <Field label="이메일 (선택)" htmlFor="inv-email"><Input id="inv-email" type="email" maxLength={254} className="h-10" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
           <fieldset className="flex items-center gap-4 text-sm">
             <legend className="mb-1 text-sm font-medium text-ink">역할</legend>
@@ -235,12 +241,19 @@ export function MembersPanel({ wsId, wsName, initial, meId, companyAdmin }: { ws
             : (
               <ul className="divide-y divide-border">
                 {inactive.map((u) => (
-                  <li key={u.id} className="flex items-center gap-3 py-2.5">
+                  <li key={u.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
                     <div className="min-w-0 flex-1">
                       <div className="text-sm text-ink">{u.name} <span className="text-xs text-ink-muted">{u.title ?? ""}</span></div>
                       <div className="truncate text-xs text-ink-muted"><span className="tabular-nums">{u.employee_no}</span> · {u.email_masked ?? "이메일 없음"}</div>
                     </div>
                     <Button size="xs" variant="outline" disabled={acting} onClick={() => reactivate(u)}>다시 활성화</Button>
+                    <Button size="xs" variant="ghost" disabled={acting} onClick={() => setDelId(delId === u.id ? null : u.id)} className="text-fail hover:bg-fail-bg hover:text-fail">삭제</Button>
+                    {delId === u.id && (
+                      <div className="flex basis-full flex-col gap-2 rounded-md border border-fail-bg bg-card p-2.5 text-xs text-ink">
+                        <span><b>{u.name}({u.employee_no})</b> 계정을 삭제합니다. 이름·이메일·직급 같은 개인정보가 지워지고 <b>되돌릴 수 없습니다.</b> 이 사번은 다시 쓸 수 없습니다. 이 사람이 쓴 기록은 지워지지 않고 작성자가 &ldquo;삭제된 계정&rdquo;으로 보입니다.</span>
+                        <div className="flex gap-2"><Button size="xs" disabled={acting} onClick={() => removeAccount(u)} className="bg-fail text-white hover:bg-fail/90">삭제</Button><Button size="xs" variant="ghost" onClick={() => setDelId(null)}>취소</Button></div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

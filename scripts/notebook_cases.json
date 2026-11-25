@@ -1,0 +1,383 @@
+{
+ "_note": "연구노트에서 고른 장애 사례 8건의 대응표(초안). 올리기 전에 내용·표현을 검수한다. 적재는 되돌릴 수 없다(삭제 API 없음) — DB 백업 뒤 진행. scripts/notebook_load.mjs 로 규칙 검사.",
+ "workspace": "SW 개발",
+ "items": [
+  {
+   "ref": "n080-p",
+   "type": "fail",
+   "title": "로그인한 뒤 화면이 타임라인과 첫 화면 사이를 오가며 깜빡임",
+   "body": "실서버에 처음 로그인했을 때 `/w/1/timeline` 과 `/` 사이를 계속 오가며 화면이 깜빡였다. 로그인 API 는 200 이고 `me()` 도 성공하는데 페이지에 들어가면 다시 로그인 화면으로 돌아간다.",
+   "created_at": "2026-11-05T04:20:00+09:00",
+   "keywords": [
+    "로그인",
+    "세션 쿠키",
+    "Path",
+    "리다이렉트 반복"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#080-p"
+  },
+  {
+   "ref": "n080-c1",
+   "type": "fail",
+   "title": "세션 쿠키가 `/api/v1` 경로에만 붙어 페이지 요청에는 실리지 않음",
+   "body": "응답 헤더를 보니 세션 쿠키가 `Path=/api/v1` 로 발급됐다. 서버 설정에 context-path 가 `/api/v1` 이고 쿠키 경로를 따로 정하지 않아 생긴 값이다. 브라우저는 `/api/v1/*` 요청에만 쿠키를 붙이므로 API 호출은 성공하지만, 페이지 요청을 받는 Next 서버는 쿠키를 못 받아 로그인하지 않은 것으로 본다.",
+   "parent_ref": "n080-p",
+   "parent_reason": "응답 헤더의 쿠키 경로를 확인해 찾은 원인",
+   "created_at": "2026-11-05T04:35:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#080-c1"
+  },
+  {
+   "ref": "n080-s",
+   "type": "success",
+   "title": "세션 쿠키 경로를 `/` 로 지정",
+   "body": "백엔드 쿠키 설정에 경로 `/` 를 지정했다. 로그인 뒤 페이지 요청에도 쿠키가 실리고 깜빡임이 사라졌다. 로그인 → 동의 → 비밀번호 변경 → 타임라인 흐름을 실서버에서 확인.",
+   "parent_ref": "n080-c1",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-05T04:50:00+09:00",
+   "resolution_summary": "context-path 아래로 발급되던 세션 쿠키의 경로를 / 로 지정해 페이지 요청에도 쿠키가 실리게 함",
+   "source": "bulk",
+   "source_ref": "notebook:#080-s"
+  },
+  {
+   "ref": "n080-x1",
+   "type": "ref",
+   "title": "로그인 진입 화면을 `/login` 으로 분리",
+   "body": "첫 화면 `/` 가 로그인 화면을 겸해 앱 아이콘을 누를 때도 깜빡였다. `/` 는 안내 화면, 로그인은 `/login` 으로 나누고 로그인 여부를 서버에서 먼저 확인하게 했다.",
+   "parent_ref": "n080-p",
+   "parent_reason": "함께 볼 참고",
+   "created_at": "2026-11-05T16:05:00+09:00",
+   "source": "bulk",
+   "source_ref": "notebook:#080-x1"
+  },
+  {
+   "ref": "n105-p",
+   "type": "fail",
+   "title": "어시스턴트 검색 내역 카드가 눌려서 내용이 가려짐",
+   "body": "어시스턴트 왼쪽의 검색 내역에서 카드 높이가 32px 로 줄어 질문 글이 잘려 보인다. 내역이 많을수록 심하다.",
+   "created_at": "2026-11-11T16:40:00+09:00",
+   "keywords": [
+    "flex-shrink",
+    "검색 내역",
+    "카드 높이",
+    "CSS"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#105-p"
+  },
+  {
+   "ref": "n105-c1",
+   "type": "fail",
+   "title": "글 줄 수 제한이 원인이라고 보고 고쳤으나 그대로",
+   "body": "카드 안 글의 줄 수 제한(line-clamp) 때문이라고 보고 제한을 풀었다. 고친 뒤에도 카드 높이는 32px 그대로였다. 증상을 잘못 짚은 수정이었다.",
+   "parent_ref": "n105-p",
+   "parent_reason": "처음 짚은 원인(틀림)",
+   "created_at": "2026-11-11T17:10:00+09:00",
+   "source": "bulk",
+   "source_ref": "notebook:#105-c1"
+  },
+  {
+   "ref": "n105-c2",
+   "type": "fail",
+   "title": "높이가 고정된 칸 안에서 카드가 flex 축소로 줄어듦",
+   "body": "개발자 도구로 계산된 높이를 보니 목록 칸의 높이가 고정돼 있고, 그 안의 카드들이 `flex-shrink: 1` 기본값 때문에 칸에 맞춰 줄어들고 있었다. 글 줄 수와는 무관했다.",
+   "parent_ref": "n105-c1",
+   "parent_reason": "계산된 스타일을 직접 확인해 다시 찾은 원인",
+   "created_at": "2026-11-11T17:20:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#105-c2"
+  },
+  {
+   "ref": "n105-s",
+   "type": "success",
+   "title": "목록의 카드가 줄어들지 않게 `shrink-0` 지정",
+   "body": "목록 칸의 자식에 `[&>*]:shrink-0` 을 주어 카드가 제 높이를 유지하고 넘치는 만큼 스크롤되게 했다. 내역 20건에서 카드 높이가 유지되는 것을 확인.",
+   "parent_ref": "n105-c2",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-11T17:25:00+09:00",
+   "resolution_summary": "고정 높이 목록 안 카드에 shrink-0 을 주어 flex 축소를 막음",
+   "source": "bulk",
+   "source_ref": "notebook:#105-s"
+  },
+  {
+   "ref": "n105-x1",
+   "type": "success",
+   "title": "화면 문제는 계산된 값을 먼저 확인한다",
+   "body": "코드만 보고 추정해 고치면 증상을 잘못 짚는다. 화면 문제는 개발자 도구의 계산된 크기·스타일을 먼저 보고 원인을 확정한 뒤 고친다.",
+   "parent_ref": "n105-p",
+   "parent_reason": "같은 문제가 다시 생기지 않게 정한 것",
+   "created_at": "2026-11-11T17:30:00+09:00",
+   "category": "prevention",
+   "source": "bulk",
+   "source_ref": "notebook:#105-x1"
+  },
+  {
+   "ref": "n109-p",
+   "type": "fail",
+   "title": "규정 파일 올리기가 400 으로 실패",
+   "body": "규정 문서 페이지에서 PDF 를 올리면 서버가 400 을 돌려준다. 같은 파일을 curl 로 올리면 성공한다.",
+   "created_at": "2026-11-13T15:20:00+09:00",
+   "keywords": [
+    "파일 업로드",
+    "multipart",
+    "Content-Type",
+    "axios",
+    "400"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#109-p"
+  },
+  {
+   "ref": "n109-c1",
+   "type": "fail",
+   "title": "공통 HTTP 클라이언트의 기본 JSON 헤더가 파일 전송 형식을 덮어씀",
+   "body": "요청을 보니 `Content-Type` 이 `application/json` 으로 나가고 있었다. 공통 axios 인스턴스에 기본 헤더로 JSON 이 지정돼 있어, FormData 를 보낼 때 브라우저가 붙여야 할 `multipart/form-data; boundary=…` 가 만들어지지 않았다.",
+   "parent_ref": "n109-p",
+   "parent_reason": "실제 요청 헤더를 확인해 찾은 원인",
+   "created_at": "2026-11-13T15:50:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#109-c1"
+  },
+  {
+   "ref": "n109-s",
+   "type": "success",
+   "title": "파일 올리기만 fetch 로 보내 브라우저가 형식을 정하게 함",
+   "body": "파일 올리기 함수만 공통 클라이언트 대신 `fetch` 를 쓰고 `Content-Type` 을 지정하지 않게 했다. PDF·TXT 올리기와 변환 시작을 실서버에서 확인.",
+   "parent_ref": "n109-c1",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-13T16:30:00+09:00",
+   "resolution_summary": "FormData 전송에서 Content-Type 을 직접 지정하지 않도록 업로드만 fetch 로 분리",
+   "source": "bulk",
+   "source_ref": "notebook:#109-s"
+  },
+  {
+   "ref": "n130-p",
+   "type": "fail",
+   "title": "타임라인을 열면 콘솔에 Hydration 오류가 남",
+   "body": "타임라인 화면을 열 때마다 브라우저 콘솔에 서버와 브라우저의 글이 다르다는 Hydration 오류가 나온다. 화면은 보이지만 날짜 글이 한 번 바뀐다.",
+   "created_at": "2026-11-23T17:30:00+09:00",
+   "keywords": [
+    "Hydration",
+    "날짜",
+    "시간대",
+    "Intl.DateTimeFormat"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#130-p"
+  },
+  {
+   "ref": "n130-c1",
+   "type": "fail",
+   "title": "서버와 브라우저의 날짜 표기가 다름(오전/AM, 시간대)",
+   "body": "서버는 영어 로케일·UTC 로 `AM 9:05`, 브라우저는 한국어·KST 로 `오전 6:05` 처럼 서로 다른 글을 만들었다. 날짜 함수에 로케일과 시간대를 지정하지 않아 실행 환경을 따라간 것이다.",
+   "parent_ref": "n130-p",
+   "parent_reason": "서버 HTML 과 브라우저 렌더 결과를 비교해 찾은 원인",
+   "created_at": "2026-11-23T17:50:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#130-c1"
+  },
+  {
+   "ref": "n130-s",
+   "type": "success",
+   "title": "날짜를 한국 시간·24시간 숫자로 직접 조립하는 공통 함수로 통일",
+   "body": "`Intl.DateTimeFormat` 에 시간대(Asia/Seoul)와 24시간제를 고정하고 숫자 조각만 꺼내 조립하는 공통 함수를 만들어 9곳을 바꿨다. 오류가 사라지고 모든 화면의 표기가 같아졌다.",
+   "parent_ref": "n130-c1",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-23T18:30:00+09:00",
+   "resolution_summary": "시간대와 24시간제를 고정한 공통 날짜 함수로 서버·브라우저 표기를 일치시킴",
+   "source": "bulk",
+   "source_ref": "notebook:#130-s"
+  },
+  {
+   "ref": "n130-x1",
+   "type": "success",
+   "title": "날짜는 공통 함수로만 표기한다",
+   "body": "화면에서 날짜를 직접 포맷하지 않고 공통 함수만 쓴다. 로케일에 따라 달라지는 글(오전/오후)은 쓰지 않는다.",
+   "parent_ref": "n130-p",
+   "parent_reason": "같은 문제가 다시 생기지 않게 정한 것",
+   "created_at": "2026-11-23T18:35:00+09:00",
+   "category": "prevention",
+   "source": "bulk",
+   "source_ref": "notebook:#130-x1"
+  },
+  {
+   "ref": "n126-p",
+   "type": "fail",
+   "title": "새 백엔드를 띄웠는데 화면은 옛 동작 그대로",
+   "body": "백엔드를 최신으로 올렸다고 했는데 계정 관리 API 가 405, 재발 방지 표시가 400 으로 나온다. 화면은 이전 버전의 응답을 받고 있다.",
+   "created_at": "2026-11-23T00:20:00+09:00",
+   "keywords": [
+    "env",
+    "포트",
+    "재기동",
+    "405"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#126-p"
+  },
+  {
+   "ref": "n126-c1",
+   "type": "fail",
+   "title": "env 파일에 포트가 두 번 적혀 옛 프로세스가 응답",
+   "body": "env 파일에 `PORT` 가 두 번(8080, 18080) 적혀 있고 AI 주소의 포트(8000)와 AI 서버 포트(18000)가 달랐다. 새 서버는 다른 포트에 떴고, 프론트가 보는 포트에는 예전 프로세스가 남아 응답하고 있었다.",
+   "parent_ref": "n126-p",
+   "parent_reason": "env 파일과 실제 응답을 대조해 찾은 원인",
+   "created_at": "2026-11-23T01:10:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#126-c1"
+  },
+  {
+   "ref": "n126-s",
+   "type": "success",
+   "title": "포트를 한 벌로 정리하고 다시 기동",
+   "body": "env 의 포트를 한 벌로 맞추고 예전 프로세스를 끈 뒤 다시 띄웠다. 계정 관리·재발 방지 표시·AI 문장이 새 동작으로 응답하는 것을 확인.",
+   "parent_ref": "n126-c1",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-23T03:30:00+09:00",
+   "resolution_summary": "중복된 포트 설정을 정리하고 남아 있던 옛 프로세스를 내려 새 서버가 응답하게 함",
+   "source": "bulk",
+   "source_ref": "notebook:#126-s"
+  },
+  {
+   "ref": "n126-x1",
+   "type": "success",
+   "title": "기동 뒤 버전 확인 한 가지를 먼저 한다",
+   "body": "서버를 다시 띄운 뒤에는 새로 생긴 API 하나를 호출해 새 버전이 응답하는지부터 확인한다.",
+   "parent_ref": "n126-p",
+   "parent_reason": "같은 문제가 다시 생기지 않게 정한 것",
+   "created_at": "2026-11-23T03:35:00+09:00",
+   "category": "prevention",
+   "source": "bulk",
+   "source_ref": "notebook:#126-x1"
+  },
+  {
+   "ref": "n114-p",
+   "type": "fail",
+   "title": "장애 보고서의 '조치와 결과' 칸이 비어 나옴",
+   "body": "완료된 장애 건으로 보고서를 만들면 '조치와 결과' 칸에 내용이 없다. 흐름에는 성공 기록이 있다.",
+   "created_at": "2026-11-15T21:10:00+09:00",
+   "keywords": [
+    "장애 보고서",
+    "해결 기록",
+    "완료 처리"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#114-p"
+  },
+  {
+   "ref": "n114-c1",
+   "type": "fail",
+   "title": "완료 처리할 때 어느 기록이 해결인지 지정되지 않음",
+   "body": "보고서는 '해결' 표시가 붙은 기록으로 이 칸을 채운다. 완료 처리는 됐지만 해결 기록이 지정되지 않은 건이었다. 시험 데이터는 기록 번호가 DB 마다 달라 대응표가 어긋났고, 화면에는 해결 기록을 고르는 방법이 없었다.",
+   "parent_ref": "n114-p",
+   "parent_reason": "보고서 응답과 기록의 표시 값을 대조해 찾은 원인",
+   "created_at": "2026-11-15T21:40:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#114-c1"
+  },
+  {
+   "ref": "n114-s",
+   "type": "success",
+   "title": "완료 처리 때 해결 기록을 고르게 함",
+   "body": "완료 처리 창에서 흐름의 성공 기록을 체크해 해결 기록으로 지정하게 했다. 성공 기록이 없으면 완료 사유만 적는다. 지정한 건의 보고서에 조치 내용이 실리는 것을 확인.",
+   "parent_ref": "n114-c1",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-23T18:30:00+09:00",
+   "resolution_summary": "완료 처리 창에 해결 기록 선택을 넣어 보고서의 조치 칸이 채워지게 함",
+   "source": "bulk",
+   "source_ref": "notebook:#114-s"
+  },
+  {
+   "ref": "n112-p",
+   "type": "fail",
+   "title": "휴대폰에서 타임라인 본문이 화면 3.7장 길이로 늘어남",
+   "body": "폰 폭에서 오른쪽 칸(고른 기록·등록 폼)이 본문 아래에 그대로 붙어 스크롤이 화면 3.7장 분량이 된다. 고른 기록을 보려면 끝까지 내려야 한다.",
+   "created_at": "2026-11-15T19:00:00+09:00",
+   "keywords": [
+    "모바일",
+    "반응형",
+    "하단 창"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#112-p"
+  },
+  {
+   "ref": "n112-c1",
+   "type": "fail",
+   "title": "넓은 화면용 2단 배치가 좁은 화면에서 세로로 쌓임",
+   "body": "PC 의 좌우 2단을 폭이 좁을 때 단순히 세로로 쌓도록 해 둔 것이 원인이다. 좁은 화면에서 보조 칸을 어떻게 보일지 정한 것이 없었다.",
+   "parent_ref": "n112-p",
+   "parent_reason": "폰 폭에서 배치를 확인해 찾은 원인",
+   "created_at": "2026-11-15T19:20:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#112-c1"
+  },
+  {
+   "ref": "n112-s",
+   "type": "success",
+   "title": "보조 칸을 아래에서 올라오는 창으로 바꿈",
+   "body": "1024px 아래에서는 오른쪽 칸을 아래에서 올라오는 창으로 보이는 공통 컴포넌트를 만들어 타임라인·등록·규정 문서에 적용했다. 본문 길이가 1장 안팎으로 줄었다.",
+   "parent_ref": "n112-c1",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-15T20:20:00+09:00",
+   "resolution_summary": "좁은 화면에서 보조 칸을 하단 창으로 띄우는 공통 컴포넌트로 본문 길이를 줄임",
+   "source": "bulk",
+   "source_ref": "notebook:#112-s"
+  },
+  {
+   "ref": "n124-p",
+   "type": "fail",
+   "title": "QHD·4K 모니터에서 화면이 작고 좌우로 늘어져 보임",
+   "body": "2560·3840 폭 모니터에서 글자가 작고 본문이 화면 전체로 늘어나 한 줄이 지나치게 길다. FHD 와 폰만 맞춰 둔 상태였다.",
+   "created_at": "2026-11-22T19:30:00+09:00",
+   "keywords": [
+    "QHD",
+    "4K",
+    "반응형",
+    "rem"
+   ],
+   "source": "bulk",
+   "source_ref": "notebook:#124-p"
+  },
+  {
+   "ref": "n124-c1",
+   "type": "fail",
+   "title": "1920px 를 넘는 폭에 대한 규칙이 없음",
+   "body": "글자 크기와 여백이 px 고정이고 본문 폭 상한이 없어, 화면이 커져도 크기는 그대로이고 폭만 늘어났다.",
+   "parent_ref": "n124-p",
+   "parent_reason": "큰 폭에서 계산된 크기를 확인해 찾은 원인",
+   "created_at": "2026-11-22T19:50:00+09:00",
+   "category": "cause",
+   "source": "bulk",
+   "source_ref": "notebook:#124-c1"
+  },
+  {
+   "ref": "n124-s",
+   "type": "success",
+   "title": "기준 글자 크기를 화면 폭에 따라 키우고 본문 폭에 상한을 둠",
+   "body": "1921px 부터 기준 글자 크기를 폭에 비례해 최대 150% 까지 키우고, 본문 최대 폭을 110rem 으로 두었다. 고정 px 여백은 rem 으로 바꿨다. 2560·3840 폭에서 확인.",
+   "parent_ref": "n124-c1",
+   "parent_reason": "이 원인을 없앤 조치",
+   "resolves": true,
+   "created_at": "2026-11-22T20:50:00+09:00",
+   "resolution_summary": "1920 초과 폭에서 기준 글자 크기 비례 확대와 본문 폭 상한을 적용",
+   "source": "bulk",
+   "source_ref": "notebook:#124-s"
+  }
+ ]
+}

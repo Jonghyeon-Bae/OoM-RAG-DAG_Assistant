@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GateFrame } from "./GateFrame";
-import { consent, privacyPolicy } from "@/lib/api/auth";
+import { consent, privacyPolicyWithVersion } from "@/lib/api/auth";
 import { Markdown } from "@/components/ui/Markdown";
 
 // 개인정보 수집·이용 동의 (작업지시 B-2). 문안은 서버 GET /auth/privacy-policy (data/legal/privacy_policy.md) — 하드코딩하지 않는다 (FE-012 P0-5, R-30)
@@ -13,7 +13,9 @@ export function ConsentForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState<string | null | undefined>(undefined); // undefined = 불러오는 중, null = 실패
-  useEffect(() => { privacyPolicy().then(setText); }, []);
+  const [version, setVersion] = useState<string | null>(null); // 지금 보여 주는 문안의 판
+  const loadPolicy = () => privacyPolicyWithVersion().then((p) => { setText(p ? p.text : null); setVersion(p?.version ?? null); });
+  useEffect(() => { privacyPolicyWithVersion().then((p) => { setText(p ? p.text : null); setVersion(p?.version ?? null); }); }, []);
   return (
     <GateFrame gate="consent">
       {(_m, done) => (
@@ -31,7 +33,15 @@ export function ConsentForm() {
           </label>
           {error && <p role="alert" className="rounded-md bg-fail-bg px-3 py-2 text-sm text-fail">{error}</p>}
           <Button type="button" size="lg" className="h-11 w-full bg-primary-700 text-white hover:bg-primary-800" disabled={!checked || busy || !text}
-            onClick={async () => { setBusy(true); setError(null); const r = await consent(); if (r.ok) await done(); else { setError(r.message); setBusy(false); } }}>
+            onClick={async () => {
+              setBusy(true); setError(null);
+              const r = await consent(version);
+              if (r.ok) { await done(); return; }
+              // 읽는 사이 문안이 바뀜 — 새 문안을 불러 다시 읽고 동의하게 한다
+              if (r.code === "CONSENT_VERSION_MISMATCH") { await loadPolicy(); setChecked(false); setError("처리방침이 방금 바뀌었습니다. 새 문안을 확인하고 다시 동의해 주세요."); }
+              else setError(r.message);
+              setBusy(false);
+            }}>
             {busy && <Loader2 className="size-4 animate-spin" />} 동의하고 계속
           </Button>
         </>

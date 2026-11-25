@@ -91,6 +91,8 @@ export interface NodePolicyRef {
   doc_title: string | null; article_label: string | null;
   revision: string | null; from_label: string | null; // 개정으로 바뀐 조문이면 개정판·이전 표기
   suggested_policy?: string | null; suggested_article?: string | null; suggested_label?: string | null;
+  // 지금 유효한 조문의 원문(배지를 누르면 보여 준다). 대응 조문이 없으면(replaced · 폐기) null. 어시스턴트 SSE 축약형에는 없다
+  document_id?: number | null; version?: string | null; page?: number | null; article_text?: string | null;
 }
 
 export interface PolicyRef {
@@ -210,6 +212,7 @@ export interface UploadReport {
   articles?: { label: string; chars: number; head: string; article: boolean }[];
   warnings?: string[];
   ocr_suspects?: { line: number; text: string }[];
+  page_numbers?: { line: number; text: string }[]; // 쪽 번호로 보이는 줄("- 1 -" 등). 저절로 지우지 않는다 — 검수자가 고르면 저장 때 strip_page_numbers 로 지운다(백엔드 #61)
   indexed?: { chunks: number; retired: unknown };
 }
 export interface PolicyUpload {
@@ -238,7 +241,7 @@ export interface PolicyUpload {
   markdown: string | null; // 상세에서만
 }
 
-export type DocEventAction = "uploaded" | "indexed" | "superseded" | "retired" | "restored" | "deleted";
+export type DocEventAction = "uploaded" | "indexed" | "superseded" | "retired" | "restored" | "deleted" | "moved"; // moved = 관리 스크립트가 문서를 다른 부서·전사 공통으로 옮김
 export interface DocEvent {
   id: number;
   workspace_id: number;
@@ -283,7 +286,7 @@ export interface Member { id: number; employee_no: string; name: string; title: 
 export interface AuditItem { id: number; at: string; category: "auth" | "member" | "settings"; action: string; employee_no: string | null; actor: string | null; ip_masked: string | null; reason: string | null }
 // GET /users/inactive — 같은 회사의 비활성 계정(회사 관리자). 멤버 목록에서는 빠지므로 재활성화는 이 목록에서 한다
 export interface InactiveUser { id: number; employee_no: string; name: string; title: string | null; email_masked: string | null }
-export interface InviteInput { employee_no: string; name: string; email?: string; title?: string; role: MemberRole }
+export interface InviteInput { employee_no: string; name: string; email?: string; title?: string; grade?: string; position?: string; role: MemberRole }
 // temp_password: 새 계정일 때만 1회 내려온다(created=false 면 null — 기존 계정을 멤버로만 추가). 화면 밖으로 남기지 않는다
 export interface InviteResult { id: number; employee_no: string; name: string; workspace_id: number; role: MemberRole; created: boolean; temp_password: string | null }
 // GET /workspaces/manageable — 설정을 바꿀 수 있는 부서. policy_docs = 상위 포함 활성 규정 수, cases = 활성 사례 수
