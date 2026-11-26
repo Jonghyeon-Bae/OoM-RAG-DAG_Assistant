@@ -9,10 +9,11 @@ import { PolicyArticleDialog } from "@/components/blocks/PolicyArticleDialog";
 // B-17 / B-45: 깊이별 열(root → 원인 → 해결)로 배치한 체인 블록. 타임라인 그래프(ChainGraph)와 어시스턴트 답변 카드 공용.
 // FE-012 P1-7·8: 원인/해결 표시, 근거 조문(따름·예외·기준 없음), 이 상위에 이어 붙인 이유
 // 카드는 흰 바탕에 두고 유형 색은 왼쪽 띠와 유형 글자에만 쓴다 — 색 면이 줄어 선과 원인·해결 표시가 먼저 보인다
+// 띠는 카드의 왼쪽 테두리 자체다 — 선택 테두리(바깥 링)와 같은 곡선을 따라가 모서리에서 어긋나 보이지 않는다
 const bar: Record<ChainNode["type"], string> = {
-  fail: "shadow-[inset_4px_0_0_var(--color-fail)]",
-  success: "shadow-[inset_4px_0_0_var(--color-success)]",
-  ref: "shadow-[inset_4px_0_0_var(--color-ref)]",
+  fail: "border-l-fail",
+  success: "border-l-success",
+  ref: "border-l-ref",
 };
 const tone: Record<ChainNode["type"], string> = { fail: "text-fail", success: "text-success", ref: "text-ref" };
 
@@ -57,11 +58,11 @@ export function ChainNodeCard({ node, compact = false, selected = false, reasons
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card py-2.5 pl-4 pr-3 text-ink sm:py-3 sm:pl-5 sm:pr-4",
+        "rounded-xl border border-l-4 bg-card py-2.5 pl-[13px] pr-3 text-ink sm:py-3 sm:pl-[17px] sm:pr-4",
         fluid ? "w-full" : compact ? "min-w-[12.5rem] max-w-[17.5rem]" : "min-w-[13.75rem] max-w-[17.5rem]",
-        bar[node.type],
         deprecated && "opacity-50 grayscale-[0.4]",
         selected ? "border-primary-700 ring-2 ring-primary-400" : "border-border",
+        bar[node.type],
       )}
     >
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-medium">
